@@ -9,6 +9,7 @@ import {
   AgentApiResponse,
   Team,
   TeamApiResponse,
+  AgentWorkload,
   AgentWorkloadStats,
   transformAgent,
   transformTeam,
@@ -96,7 +97,39 @@ export class AgentService extends BaseService<Agent, AgentApiResponse> {
   /**
    * Get workload statistics for agents.
    */
-  async getWorkloadStats(agentId?: number): Promise<AgentWorkloadStats> {
+  async getWorkloadStats(): Promise<AgentWorkload[]> {
+    const agents = await this.listActive();
+
+    return agents.map((agent) => ({
+      agentId: agent.id,
+      agentName: getAgentFullName(agent),
+      openTickets: agent.openTicketCount || 0,
+      overdueTickets: agent.ticketsDueToday || 0, // Using due today as proxy for overdue
+      ticketsClosedToday: 0, // Would need separate API call
+      ticketsClosedThisWeek: 0, // Would need separate API call
+    }));
+  }
+
+  /**
+   * Get workload for a specific agent.
+   */
+  async getAgentWorkload(agentId: number): Promise<AgentWorkload> {
+    const agent = await this.get(agentId);
+
+    return {
+      agentId: agent.id,
+      agentName: getAgentFullName(agent),
+      openTickets: agent.openTicketCount || 0,
+      overdueTickets: agent.ticketsDueToday || 0,
+      ticketsClosedToday: 0,
+      ticketsClosedThisWeek: 0,
+    };
+  }
+
+  /**
+   * Get aggregate workload statistics.
+   */
+  async getWorkloadSummary(agentId?: number): Promise<AgentWorkloadStats> {
     let agents: Agent[];
 
     if (agentId) {

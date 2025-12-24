@@ -10,6 +10,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // shadcn/ui compatible colors using CSS variables
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
         // Primary turquoise palette
         turquoise: {
           50: '#effefb',
@@ -26,6 +56,8 @@ const config: Config = {
         },
         // Accent colors
         accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
           cyan: '#06b6d4',
           teal: '#14b8a6',
           emerald: '#10b981',
@@ -34,11 +66,6 @@ const config: Config = {
         surface: {
           light: '#fcfbf8',
           dark: '#0a0a0a',
-        },
-        // Card backgrounds
-        card: {
-          light: 'rgba(255, 255, 255, 0.8)',
-          dark: 'rgba(26, 26, 26, 0.8)',
         },
       },
       fontFamily: {

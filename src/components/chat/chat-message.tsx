@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { Message } from 'ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { Prism as SyntaxHighlighter, SyntaxHighlighterProps } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Sparkles, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
@@ -73,11 +73,12 @@ export const ChatMessage = memo(function ChatMessage({
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  code({ node, inline, className, children, ...props }) {
+                  code({ className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '');
                     const codeString = String(children).replace(/\n$/, '');
+                    const isInline = !match;
 
-                    if (!inline && match) {
+                    if (!isInline && match) {
                       return (
                         <div className="relative group">
                           <button
@@ -92,11 +93,10 @@ export const ChatMessage = memo(function ChatMessage({
                             )}
                           </button>
                           <SyntaxHighlighter
-                            style={oneDark}
+                            style={oneDark as SyntaxHighlighterProps['style']}
                             language={match[1]}
                             PreTag="div"
                             className="rounded-lg !mt-0"
-                            {...props}
                           >
                             {codeString}
                           </SyntaxHighlighter>

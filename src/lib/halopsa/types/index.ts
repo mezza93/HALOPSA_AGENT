@@ -14,5 +14,17 @@ export * from './client';
 // Agent types
 export * from './agent';
 
-// Asset types (to be added)
-// export * from './asset';
+// Asset types
+export * from './asset';
+
+// Knowledge Base types
+export * from './knowledgebase';
+
+// Billing types
+export * from './billing';
+
+// Contract types
+export * from './contracts';
+
+// Report types
+export * from './reports';

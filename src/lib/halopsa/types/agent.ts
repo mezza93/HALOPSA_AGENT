@@ -146,6 +146,20 @@ export interface AgentApiResponse {
 }
 
 /**
+ * Individual agent workload data.
+ */
+export interface AgentWorkload {
+  agentId: number;
+  agentName?: string;
+  openTickets: number;
+  overdueTickets: number;
+  ticketsClosedToday?: number;
+  ticketsClosedThisWeek?: number;
+  averageResponseTime?: number;
+  averageResolutionTime?: number;
+}
+
+/**
  * Agent workload statistics.
  */
 export interface AgentWorkloadStats {

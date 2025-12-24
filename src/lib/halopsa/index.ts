@@ -59,13 +59,31 @@ export function createHaloServices(config: {
   const { TicketService } = require('./services/tickets');
   const { ClientService } = require('./services/clients');
   const { AgentService } = require('./services/agents');
+  const { AssetService } = require('./services/assets');
+  const { KnowledgeBaseService } = require('./services/knowledgebase');
+  const { TimeEntryService, InvoiceService, ProjectService, ExpenseService } = require('./services/billing');
+  const { ContractService } = require('./services/contracts');
+  const { ReportService } = require('./services/reports');
 
   const client = new HaloPSAClient(config);
 
   return {
     client,
+    // Core services
     tickets: new TicketService(client),
     clients: new ClientService(client),
     agents: new AgentService(client),
+    assets: new AssetService(client),
+    // Knowledge Base
+    kb: new KnowledgeBaseService(client),
+    // Billing
+    timeEntries: new TimeEntryService(client),
+    invoices: new InvoiceService(client),
+    projects: new ProjectService(client),
+    expenses: new ExpenseService(client),
+    // Contracts & SLAs
+    contracts: new ContractService(client),
+    // Reports & Dashboards
+    reports: new ReportService(client),
   };
 }

@@ -32,8 +32,8 @@ export interface ListOpenParams extends ListParams {
  * Parameters for listing closed tickets.
  */
 export interface ListClosedParams extends ListParams {
-  startDate?: Date | string;
-  endDate?: Date | string;
+  startDate?: string;
+  endDate?: string;
   clientId?: number;
 }
 
@@ -84,12 +84,10 @@ export class TicketService extends BaseService<Ticket, TicketApiResponse> {
     };
 
     if (startDate) {
-      queryParams.startdate =
-        startDate instanceof Date ? startDate.toISOString() : startDate;
+      queryParams.startdate = startDate;
     }
     if (endDate) {
-      queryParams.enddate =
-        endDate instanceof Date ? endDate.toISOString() : endDate;
+      queryParams.enddate = endDate;
     }
     if (clientId) queryParams.client_id = clientId;
 
