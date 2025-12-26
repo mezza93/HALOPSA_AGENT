@@ -85,20 +85,20 @@ export const WIDGET_TEMPLATES: Record<string, WidgetTemplate> = {
   },
 
   // Chart widgets (report-based, types 0, 1)
+  // Note: Using Request_View which is a pre-joined view with readable column names
+  // Column names with spaces must be quoted with [ ]
+  // ORDER BY requires TOP in subqueries for SQL Server
   tickets_by_priority: {
     name: 'Tickets by Priority',
     widgetType: 1, // Pie chart
     description: 'Pie chart showing ticket distribution by priority',
     reportKeywords: ['priority', 'tickets by priority', 'ticket priority'],
-    fallbackSql: `
-SELECT
-    COALESCE(p.name, 'No Priority') AS Priority,
-    COUNT(*) AS Count
-FROM Faults f
-LEFT JOIN Priority p ON f.priority_id = p.id
-WHERE f.statustype_id NOT IN (2, 3)
-GROUP BY p.name
-ORDER BY Count DESC`,
+    fallbackSql: `SELECT TOP 100
+    COALESCE([Priority Description], 'No Priority') AS [Priority],
+    COUNT(*) AS [Count]
+FROM Request_View
+WHERE [Status ID] NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
+GROUP BY [Priority Description]`,
     fallbackReportName: 'Dashboard - Tickets by Priority',
     filterId: null,
     ticketareaId: null,
@@ -111,15 +111,12 @@ ORDER BY Count DESC`,
     widgetType: 1, // Pie chart
     description: 'Pie chart showing ticket distribution by status',
     reportKeywords: ['status', 'tickets by status', 'ticket status'],
-    fallbackSql: `
-SELECT
-    s.name AS Status,
-    COUNT(*) AS Count
-FROM Faults f
-JOIN Status s ON f.status_id = s.id
-WHERE f.dateoccurred >= DATEADD(day, -30, GETDATE())
-GROUP BY s.name
-ORDER BY Count DESC`,
+    fallbackSql: `SELECT TOP 100
+    COALESCE([Status], 'Unknown') AS [Status],
+    COUNT(*) AS [Count]
+FROM Request_View
+WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
+GROUP BY [Status]`,
     fallbackReportName: 'Dashboard - Tickets by Status',
     filterId: null,
     ticketareaId: null,
@@ -132,15 +129,12 @@ ORDER BY Count DESC`,
     widgetType: 1, // Pie chart
     description: 'Pie chart showing tickets by client',
     reportKeywords: ['client', 'tickets by client', 'customer tickets', 'top clients'],
-    fallbackSql: `
-SELECT TOP 10
-    COALESCE(c.name, 'No Client') AS Client,
-    COUNT(*) AS Count
-FROM Faults f
-LEFT JOIN Client c ON f.client_id = c.id
-WHERE f.dateoccurred >= DATEADD(day, -30, GETDATE())
-GROUP BY c.name
-ORDER BY Count DESC`,
+    fallbackSql: `SELECT TOP 10
+    COALESCE([Customer Name], 'No Client') AS [Client],
+    COUNT(*) AS [Count]
+FROM Request_View
+WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
+GROUP BY [Customer Name]`,
     fallbackReportName: 'Dashboard - Tickets by Client',
     filterId: null,
     ticketareaId: null,
@@ -153,15 +147,12 @@ ORDER BY Count DESC`,
     widgetType: 1, // Pie chart
     description: 'Pie chart showing tickets by category',
     reportKeywords: ['category', 'tickets by category', 'ticket categories'],
-    fallbackSql: `
-SELECT
-    COALESCE(cat.name, 'Uncategorized') AS Category,
-    COUNT(*) AS Count
-FROM Faults f
-LEFT JOIN Category1 cat ON f.category_1 = cat.id
-WHERE f.dateoccurred >= DATEADD(day, -30, GETDATE())
-GROUP BY cat.name
-ORDER BY Count DESC`,
+    fallbackSql: `SELECT TOP 100
+    COALESCE([Category], 'Uncategorized') AS [Category],
+    COUNT(*) AS [Count]
+FROM Request_View
+WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
+GROUP BY [Category]`,
     fallbackReportName: 'Dashboard - Tickets by Category',
     filterId: null,
     ticketareaId: null,
@@ -174,15 +165,13 @@ ORDER BY Count DESC`,
     widgetType: 0, // Bar chart
     description: 'Bar chart showing open tickets per agent',
     reportKeywords: ['agent', 'workload', 'agent workload', 'tickets by agent', 'technician'],
-    fallbackSql: `
-SELECT
-    COALESCE(a.name, 'Unassigned') AS Agent,
-    COUNT(*) AS OpenTickets
-FROM Faults f
-LEFT JOIN Agent a ON f.agent_id = a.id
-WHERE f.statustype_id NOT IN (2, 3)
-GROUP BY a.name
-ORDER BY OpenTickets DESC`,
+    fallbackSql: `SELECT TOP 20
+    COALESCE(u.uname, 'Unassigned') AS [Agent],
+    COUNT(*) AS [Open Tickets]
+FROM FAULTS f
+LEFT JOIN UNAME u ON f.Assignedtoint = u.Unum
+WHERE f.Status NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
+GROUP BY u.uname`,
     fallbackReportName: 'Dashboard - Agent Workload',
     filterId: null,
     ticketareaId: null,
@@ -195,15 +184,13 @@ ORDER BY OpenTickets DESC`,
     widgetType: 0, // Bar chart
     description: 'Bar chart showing tickets closed by each agent',
     reportKeywords: ['closed', 'agent closed', 'closed by agent', 'resolved by'],
-    fallbackSql: `
-SELECT TOP 10
-    COALESCE(a.name, 'Unknown') AS Agent,
-    COUNT(*) AS ClosedTickets
-FROM Faults f
-JOIN Agent a ON f.closedby_agent_id = a.id
-WHERE f.dateclosed >= DATEADD(day, -30, GETDATE())
-GROUP BY a.name
-ORDER BY ClosedTickets DESC`,
+    fallbackSql: `SELECT TOP 10
+    COALESCE(u.uname, 'Unknown') AS [Agent],
+    COUNT(*) AS [Closed Tickets]
+FROM FAULTS f
+JOIN UNAME u ON f.Clearwhoint = u.Unum
+WHERE f.datecleared >= DATEADD(day, -30, GETDATE())
+GROUP BY u.uname`,
     fallbackReportName: 'Dashboard - Tickets Closed by Agent',
     filterId: null,
     ticketareaId: null,
@@ -216,14 +203,12 @@ ORDER BY ClosedTickets DESC`,
     widgetType: 0, // Bar/Line chart
     description: 'Chart showing ticket volume over time',
     reportKeywords: ['over time', 'daily tickets', 'weekly tickets', 'trend'],
-    fallbackSql: `
-SELECT
-    CONVERT(varchar, f.dateoccurred, 23) AS Date,
-    COUNT(*) AS TicketCount
-FROM Faults f
-WHERE f.dateoccurred >= DATEADD(day, -30, GETDATE())
-GROUP BY CONVERT(varchar, f.dateoccurred, 23)
-ORDER BY Date`,
+    fallbackSql: `SELECT TOP 30
+    CONVERT(varchar, [Date Logged], 23) AS [Date],
+    COUNT(*) AS [Ticket Count]
+FROM Request_View
+WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
+GROUP BY CONVERT(varchar, [Date Logged], 23)`,
     fallbackReportName: 'Dashboard - Tickets Over Time',
     filterId: null,
     ticketareaId: null,
@@ -236,22 +221,12 @@ ORDER BY Date`,
     widgetType: 1, // Pie chart
     description: 'Pie chart showing SLA compliance',
     reportKeywords: ['sla', 'sla performance', 'sla breach', 'response time'],
-    fallbackSql: `
-SELECT
-    CASE
-        WHEN f.slahold = 1 THEN 'On Hold'
-        WHEN f.slabreach = 1 THEN 'Breached'
-        ELSE 'Within SLA'
-    END AS SLAStatus,
-    COUNT(*) AS Count
-FROM Faults f
-WHERE f.statustype_id NOT IN (2, 3)
-GROUP BY
-    CASE
-        WHEN f.slahold = 1 THEN 'On Hold'
-        WHEN f.slabreach = 1 THEN 'Breached'
-        ELSE 'Within SLA'
-    END`,
+    fallbackSql: `SELECT TOP 10
+    COALESCE([SLA Compliance], 'Unknown') AS [SLA Status],
+    COUNT(*) AS [Count]
+FROM Request_View
+WHERE [Status ID] NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
+GROUP BY [SLA Compliance]`,
     fallbackReportName: 'Dashboard - SLA Performance',
     filterId: null,
     ticketareaId: null,
@@ -264,12 +239,11 @@ GROUP BY
     widgetType: 2, // Counter (report-based)
     description: 'Average first response time',
     reportKeywords: ['response time', 'first response', 'average response'],
-    fallbackSql: `
-SELECT
-    CAST(AVG(DATEDIFF(minute, f.dateoccurred, f.firstactiondate)) / 60.0 AS DECIMAL(10,1)) AS AvgResponseHours
-FROM Faults f
-WHERE f.firstactiondate IS NOT NULL
-    AND f.dateoccurred >= DATEADD(day, -30, GETDATE())`,
+    fallbackSql: `SELECT TOP 1
+    CAST(AVG([Response Time]) AS DECIMAL(10,1)) AS [Avg Response Hours]
+FROM Request_View
+WHERE [Response Date] IS NOT NULL
+    AND [Date Logged] >= DATEADD(day, -30, GETDATE())`,
     fallbackReportName: 'Dashboard - Avg Response Time',
     filterId: null,
     ticketareaId: null,
@@ -282,15 +256,12 @@ WHERE f.firstactiondate IS NOT NULL
     widgetType: 1, // Pie chart
     description: 'Top users submitting tickets',
     reportKeywords: ['caller', 'top callers', 'users', 'requesters'],
-    fallbackSql: `
-SELECT TOP 10
-    COALESCE(u.name, 'Unknown') AS Caller,
-    COUNT(*) AS TicketCount
-FROM Faults f
-LEFT JOIN Users u ON f.user_id = u.id
-WHERE f.dateoccurred >= DATEADD(day, -30, GETDATE())
-GROUP BY u.name
-ORDER BY TicketCount DESC`,
+    fallbackSql: `SELECT TOP 10
+    COALESCE([User], 'Unknown') AS [Caller],
+    COUNT(*) AS [Ticket Count]
+FROM Request_View
+WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
+GROUP BY [User]`,
     fallbackReportName: 'Dashboard - Top Callers',
     filterId: null,
     ticketareaId: null,
