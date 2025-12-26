@@ -77,5 +77,38 @@ export function createAttachmentTools(ctx: HaloContext) {
         };
       },
     }),
+
+    uploadAttachment: tool({
+      description: 'Upload an attachment to a ticket. Accepts base64-encoded file content.',
+      parameters: z.object({
+        ticketId: z.number().describe('The ticket ID to attach the file to'),
+        fileName: z.string().describe('Name of the file including extension'),
+        contentBase64: z.string().describe('Base64-encoded file content'),
+        contentType: z.string().optional().describe('MIME type of the file (e.g., "image/png", "application/pdf")'),
+        description: z.string().optional().describe('Optional description for the attachment'),
+      }),
+      execute: async ({ ticketId, fileName, contentBase64, contentType, description }) => {
+        try {
+          const result = await ctx.attachments.upload(ticketId, {
+            fileName,
+            contentBase64,
+            contentType,
+            description,
+          });
+          return {
+            success: true,
+            attachmentId: result.id,
+            fileName: result.fileName,
+            fileSize: result.fileSize,
+            message: `File '${fileName}' uploaded successfully to ticket #${ticketId}`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to upload attachment',
+          };
+        }
+      },
+    }),
   };
 }

@@ -102,6 +102,31 @@ export class AttachmentService {
   }
 
   /**
+   * Upload an attachment to a ticket with full metadata.
+   */
+  async upload(ticketId: number, data: {
+    fileName: string;
+    contentBase64: string;
+    contentType?: string;
+    description?: string;
+  }): Promise<Attachment> {
+    const attachmentData = {
+      ticket_id: ticketId,
+      filename: data.fileName,
+      filedata: data.contentBase64,
+      contenttype: data.contentType,
+      description: data.description,
+      isinline: false,
+    };
+
+    const response = await this.client.post<AttachmentApiResponse[]>('/Attachment', [attachmentData]);
+    if (response && response.length > 0) {
+      return transformAttachment(response[0]);
+    }
+    throw new Error('Failed to upload attachment');
+  }
+
+  /**
    * Copy attachments from one ticket to another.
    */
   async copyToTicket(

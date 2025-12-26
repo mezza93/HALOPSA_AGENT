@@ -291,5 +291,215 @@ export function createConfigurationTools(ctx: HaloContext) {
         };
       },
     }),
+
+    // === Custom Fields ===
+    createCustomField: tool({
+      description: 'Create a new custom field.',
+      parameters: z.object({
+        name: z.string().describe('Field name (internal)'),
+        label: z.string().describe('Field label (displayed to users)'),
+        type: z.enum(['text', 'number', 'date', 'dropdown', 'checkbox', 'textarea']).describe('Field type'),
+        table: z.enum(['ticket', 'client', 'asset', 'user', 'contract']).describe('Table to add field to'),
+        isRequired: z.boolean().optional().default(false).describe('Whether field is required'),
+        options: z.array(z.string()).optional().describe('Options for dropdown fields'),
+      }),
+      execute: async ({ name, label, type, table, isRequired, options }) => {
+        const fieldData: Record<string, unknown> = {
+          name,
+          label,
+          type,
+          table,
+          isRequired,
+        };
+        if (options) fieldData.options = options;
+
+        const result = await ctx.configuration.createCustomField(fieldData);
+        return {
+          success: true,
+          fieldId: result[0]?.id,
+          name,
+          message: `Custom field '${label}' created successfully`,
+        };
+      },
+    }),
+
+    // === Workflows ===
+    createWorkflow: tool({
+      description: 'Create a new automation workflow.',
+      parameters: z.object({
+        name: z.string().describe('Workflow name'),
+        description: z.string().optional().describe('Workflow description'),
+        triggerType: z.enum(['ticket_created', 'ticket_updated', 'ticket_closed', 'sla_breach', 'scheduled']).describe('When workflow triggers'),
+        isActive: z.boolean().optional().default(true).describe('Whether workflow is active'),
+        conditions: z.string().optional().describe('Workflow conditions (JSON)'),
+        actions: z.string().optional().describe('Workflow actions (JSON)'),
+      }),
+      execute: async ({ name, description, triggerType, isActive, conditions, actions }) => {
+        const workflowData: Record<string, unknown> = {
+          name,
+          triggerType,
+          isActive,
+        };
+        if (description) workflowData.description = description;
+        if (conditions) workflowData.conditions = JSON.parse(conditions);
+        if (actions) workflowData.actions = JSON.parse(actions);
+
+        const result = await ctx.configuration.createWorkflow(workflowData);
+        return {
+          success: true,
+          workflowId: result[0]?.id,
+          name,
+          message: `Workflow '${name}' created successfully`,
+        };
+      },
+    }),
+
+    // === Email Templates ===
+    updateEmailTemplate: tool({
+      description: 'Update an existing email template.',
+      parameters: z.object({
+        templateId: z.number().describe('The email template ID'),
+        name: z.string().optional().describe('New template name'),
+        subject: z.string().optional().describe('New email subject'),
+        body: z.string().optional().describe('New email body (HTML)'),
+        isActive: z.boolean().optional().describe('Whether template is active'),
+      }),
+      execute: async ({ templateId, name, subject, body, isActive }) => {
+        const updateData: Record<string, unknown> = { id: templateId };
+        if (name !== undefined) updateData.name = name;
+        if (subject !== undefined) updateData.subject = subject;
+        if (body !== undefined) updateData.body = body;
+        if (isActive !== undefined) updateData.isActive = isActive;
+
+        const result = await ctx.configuration.updateEmailTemplate(updateData);
+        return {
+          success: true,
+          templateId,
+          message: `Email template updated successfully`,
+        };
+      },
+    }),
+
+    // === Escalation Rules ===
+    listEscalationRules: tool({
+      description: 'List escalation rules.',
+      parameters: z.object({
+        count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
+      }),
+      execute: async ({ count }) => {
+        const rules = await ctx.configuration.listEscalationRules({ count: count || DEFAULT_COUNT });
+        return rules;
+      },
+    }),
+
+    createEscalationRule: tool({
+      description: 'Create a new escalation rule.',
+      parameters: z.object({
+        name: z.string().describe('Rule name'),
+        description: z.string().optional().describe('Rule description'),
+        triggerMinutes: z.number().describe('Minutes before escalation triggers'),
+        escalateTo: z.number().describe('Agent or team ID to escalate to'),
+        escalateToType: z.enum(['agent', 'team']).describe('Escalate to agent or team'),
+        isActive: z.boolean().optional().default(true).describe('Whether rule is active'),
+      }),
+      execute: async ({ name, description, triggerMinutes, escalateTo, escalateToType, isActive }) => {
+        const ruleData: Record<string, unknown> = {
+          name,
+          triggerMinutes,
+          escalateTo,
+          escalateToType,
+          isActive,
+        };
+        if (description) ruleData.description = description;
+
+        const result = await ctx.configuration.createEscalationRule(ruleData);
+        return {
+          success: true,
+          ruleId: result[0]?.id,
+          name,
+          message: `Escalation rule '${name}' created successfully`,
+        };
+      },
+    }),
+
+    // === System Settings ===
+    listSystemSettings: tool({
+      description: 'List system settings.',
+      parameters: z.object({
+        category: z.string().optional().describe('Filter by category'),
+      }),
+      execute: async ({ category }) => {
+        const settings = await ctx.configuration.listSystemSettings({ category });
+        return settings;
+      },
+    }),
+
+    getSystemSetting: tool({
+      description: 'Get a specific system setting value.',
+      parameters: z.object({
+        key: z.string().describe('Setting key'),
+      }),
+      execute: async ({ key }) => {
+        return ctx.configuration.getSystemSetting(key);
+      },
+    }),
+
+    updateSystemSetting: tool({
+      description: 'Update a system setting value.',
+      parameters: z.object({
+        key: z.string().describe('Setting key'),
+        value: z.string().describe('New setting value'),
+      }),
+      execute: async ({ key, value }) => {
+        await ctx.configuration.updateSystemSetting(key, value);
+        return {
+          success: true,
+          key,
+          message: `System setting '${key}' updated successfully`,
+        };
+      },
+    }),
+
+    // === API & Lookup ===
+    getApiInfo: tool({
+      description: 'Get HaloPSA API information and version.',
+      parameters: z.object({}),
+      execute: async () => {
+        return ctx.configuration.getApiInfo();
+      },
+    }),
+
+    getLookupValues: tool({
+      description: 'Get lookup values for a specific field or table.',
+      parameters: z.object({
+        lookupType: z.enum(['status', 'priority', 'category', 'type', 'team', 'agent']).describe('Type of lookup values'),
+        parentId: z.number().optional().describe('Parent ID for hierarchical lookups'),
+      }),
+      execute: async ({ lookupType, parentId }) => {
+        return ctx.configuration.getLookupValues(lookupType, { parentId });
+      },
+    }),
+
+    getFieldInfo: tool({
+      description: 'Get information about a specific field including its type, options, and constraints.',
+      parameters: z.object({
+        tableName: z.enum(['ticket', 'client', 'asset', 'user', 'contract']).describe('Table name'),
+        fieldName: z.string().describe('Field name'),
+      }),
+      execute: async ({ tableName, fieldName }) => {
+        return ctx.configuration.getFieldInfo(tableName, fieldName);
+      },
+    }),
+
+    getSlaPolicies: tool({
+      description: 'Get SLA policies and their configurations.',
+      parameters: z.object({
+        clientId: z.number().optional().describe('Filter by client ID'),
+        ticketTypeId: z.number().optional().describe('Filter by ticket type ID'),
+      }),
+      execute: async ({ clientId, ticketTypeId }) => {
+        return ctx.configuration.getSlaPolicies({ clientId, ticketTypeId });
+      },
+    }),
   };
 }

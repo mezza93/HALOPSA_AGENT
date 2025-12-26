@@ -125,6 +125,86 @@ export function createReportTools(ctx: HaloContext) {
       },
     }),
 
+    updateReport: tool({
+      description: 'Update an existing report.',
+      parameters: z.object({
+        reportId: z.number().describe('The report ID to update'),
+        name: z.string().optional().describe('New report name'),
+        sqlQuery: z.string().optional().describe('New SQL query'),
+        description: z.string().optional().describe('New description'),
+        category: z.string().optional().describe('New category'),
+        isShared: z.boolean().optional().describe('Whether to share with other users'),
+      }),
+      execute: async ({ reportId, name, sqlQuery, description, category, isShared }) => {
+        const updateData: Record<string, unknown> = { id: reportId };
+        if (name !== undefined) updateData.name = name;
+        if (sqlQuery !== undefined) updateData.sqlQuery = sqlQuery;
+        if (description !== undefined) updateData.description = description;
+        if (category !== undefined) updateData.category = category;
+        if (isShared !== undefined) updateData.isShared = isShared;
+
+        const reports = await ctx.reports.update([updateData]);
+        if (reports && reports.length > 0) {
+          return {
+            success: true,
+            reportId: reports[0].id,
+            name: reports[0].name,
+            message: `Report updated successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to update report' };
+      },
+    }),
+
+    deleteReport: tool({
+      description: 'Delete a report.',
+      parameters: z.object({
+        reportId: z.number().describe('The report ID to delete'),
+      }),
+      execute: async ({ reportId }) => {
+        await ctx.reports.delete(reportId);
+        return {
+          success: true,
+          reportId,
+          message: `Report ${reportId} deleted successfully`,
+        };
+      },
+    }),
+
+    runSavedReport: tool({
+      description: 'Run a saved/predefined report by name.',
+      parameters: z.object({
+        reportName: z.string().describe('Name of the saved report'),
+        startDate: z.string().optional().describe('Start date for filtering (YYYY-MM-DD)'),
+        endDate: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
+        clientId: z.number().optional().describe('Filter by client ID'),
+        agentId: z.number().optional().describe('Filter by agent ID'),
+      }),
+      execute: async ({ reportName, startDate, endDate, clientId, agentId }) => {
+        // First find the report by name
+        const reports = await ctx.reports.list({ search: reportName, count: 10 });
+        const report = reports.find((r: Report) => r.name.toLowerCase().includes(reportName.toLowerCase()));
+
+        if (!report) {
+          return {
+            success: false,
+            error: `Report '${reportName}' not found`,
+          };
+        }
+
+        const result = await ctx.reports.run(report.id, { startDate, endDate, clientId, agentId });
+
+        return {
+          reportId: report.id,
+          reportName: report.name,
+          columns: result.columns,
+          rows: result.rows.slice(0, MAX_REPORT_ROWS),
+          rowCount: result.rowCount,
+          executedAt: result.executedAt,
+        };
+      },
+    }),
+
     // === SCHEDULED REPORTS ===
     listScheduledReports: tool({
       description: 'List scheduled report deliveries.',

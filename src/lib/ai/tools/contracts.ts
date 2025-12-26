@@ -246,6 +246,35 @@ export function createContractTools(ctx: HaloContext) {
       },
     }),
 
+    createSla: tool({
+      description: 'Create a new SLA (Service Level Agreement).',
+      parameters: z.object({
+        name: z.string().describe('SLA name'),
+        description: z.string().optional().describe('SLA description'),
+        isDefault: z.boolean().optional().default(false).describe('Whether this is the default SLA'),
+        isActive: z.boolean().optional().default(true).describe('Whether SLA is active'),
+      }),
+      execute: async ({ name, description, isDefault, isActive }) => {
+        const slaData: Record<string, unknown> = {
+          name,
+          isDefault: isDefault || false,
+          isActive: isActive !== false,
+        };
+        if (description) slaData.description = description;
+
+        const slas = await ctx.contracts.slas.create([slaData]);
+        if (slas && slas.length > 0) {
+          return {
+            success: true,
+            slaId: slas[0].id,
+            name: slas[0].name,
+            message: `SLA '${name}' created successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to create SLA' };
+      },
+    }),
+
     createSlaTarget: tool({
       description: 'Create a new SLA target for a specific priority.',
       parameters: z.object({
