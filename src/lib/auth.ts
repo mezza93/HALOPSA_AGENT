@@ -8,7 +8,7 @@
  * - Role-based access control
  */
 
-import NextAuth, { type DefaultSession } from 'next-auth';
+import NextAuth, { type DefaultSession, type NextAuthConfig } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
@@ -31,17 +31,19 @@ declare module 'next-auth' {
   }
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma) as never,
+const authConfig: NextAuthConfig = {
+  adapter: PrismaAdapter(prisma) as NextAuthConfig['adapter'],
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  trustHost: true,
   pages: {
     signIn: '/login',
     error: '/login',
     newUser: '/onboarding',
   },
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     // Google OAuth
     Google({
@@ -154,7 +156,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       console.log(`New user created: ${user.email}`);
     },
   },
-});
+};
+
+export const { handlers, signIn, signOut, auth } = NextAuth(authConfig);
 
 // Helper to check if user is admin
 export function isAdmin(role: string | undefined): boolean {

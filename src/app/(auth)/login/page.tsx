@@ -29,13 +29,24 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        toast.error(result.error);
-      } else {
-        router.push(callbackUrl);
+        toast.error(result.error === 'CredentialsSignin'
+          ? 'Invalid email or password'
+          : result.error);
+        setIsLoading(false);
+        return;
       }
-    } catch {
+
+      if (result?.ok) {
+        // Refresh to update session state before redirect
+        router.refresh();
+        router.push(callbackUrl);
+      } else {
+        toast.error('Sign in failed. Please try again.');
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
       toast.error('An error occurred. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
