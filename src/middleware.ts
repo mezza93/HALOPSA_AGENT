@@ -41,15 +41,8 @@ function checkRateLimit(key: string, limit: number, windowMs: number): { allowed
   return { allowed: true, remaining: limit - record.count };
 }
 
-// Clean up old rate limit entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of rateLimitMap.entries()) {
-    if (now > record.resetTime) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 60000); // Clean every minute
+// Note: Cleanup happens during checkRateLimit calls
+// setInterval is not supported in Edge runtime
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -57,16 +50,17 @@ export async function middleware(request: NextRequest) {
   // Add security headers to all responses
   const response = NextResponse.next();
 
-  // Content Security Policy
+  // Content Security Policy - allow OAuth and API connections
   response.headers.set(
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.googleusercontent.com https://*.halopsa.com",
-      "connect-src 'self' https://*.halopsa.com https://api.anthropic.com",
+      "img-src 'self' data: blob: https://*.googleusercontent.com https://*.halopsa.com https://lh3.googleusercontent.com",
+      "connect-src 'self' https://*.halopsa.com https://api.anthropic.com https://accounts.google.com https://oauth2.googleapis.com",
+      "frame-src 'self' https://accounts.google.com",
       "frame-ancestors 'none'",
     ].join('; ')
   );
