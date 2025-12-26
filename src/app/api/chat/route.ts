@@ -291,7 +291,7 @@ export async function POST(req: Request) {
     let result;
     try {
       result = streamText({
-        model: anthropic('claude-sonnet-4-20250514'),
+        model: anthropic('claude-opus-4-5-20251101'),
         system: SYSTEM_PROMPT + connectionContext,
         messages,
         tools: Object.keys(tools).length > 0 ? tools : undefined,
