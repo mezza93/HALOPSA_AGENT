@@ -41,10 +41,9 @@ function LoginForm() {
 
       if (result?.ok) {
         toast.success('Signed in successfully!');
-        // Small delay to ensure session is established
-        await new Promise(resolve => setTimeout(resolve, 100));
-        router.refresh();
-        router.push(callbackUrl);
+        // Use window.location for reliable redirect after auth
+        window.location.href = callbackUrl;
+        return;
       } else {
         console.error('Sign in failed without error:', result);
         toast.error('Sign in failed. Please try again.');
