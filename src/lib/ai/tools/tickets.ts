@@ -11,6 +11,32 @@ const DEFAULT_COUNT = 20;
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_ACTION_LIMIT = 10;
 
+/**
+ * Format error for tool response.
+ */
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 export function createTicketTools(ctx: HaloContext) {
   return {
     // === READ OPERATIONS ===
@@ -24,29 +50,36 @@ export function createTicketTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number of tickets to return'),
       }),
       execute: async ({ status, clientId, agentId, search, count }) => {
-        const limit = Math.min(count || DEFAULT_COUNT, MAX_PAGE_SIZE);
+        try {
+          const limit = Math.min(count || DEFAULT_COUNT, MAX_PAGE_SIZE);
 
-        let tickets: Ticket[];
-        if (search) {
-          tickets = await ctx.tickets.search(search, limit);
-        } else if (status === 'open') {
-          tickets = await ctx.tickets.listOpen({ clientId, agentId, count: limit });
-        } else if (status === 'closed') {
-          tickets = await ctx.tickets.listClosed({ clientId, count: limit });
-        } else {
-          tickets = await ctx.tickets.list({ client_id: clientId, agent_id: agentId, count: limit });
+          let tickets: Ticket[];
+          if (search) {
+            tickets = await ctx.tickets.search(search, limit);
+          } else if (status === 'open') {
+            tickets = await ctx.tickets.listOpen({ clientId, agentId, count: limit });
+          } else if (status === 'closed') {
+            tickets = await ctx.tickets.listClosed({ clientId, count: limit });
+          } else {
+            tickets = await ctx.tickets.list({ client_id: clientId, agent_id: agentId, count: limit });
+          }
+
+          return {
+            success: true,
+            tickets: tickets.map((t: Ticket) => ({
+              id: t.id,
+              summary: t.summary,
+              status: t.statusName,
+              priority: t.priorityName,
+              client: t.clientName,
+              agent: t.agentName,
+              created: t.dateCreated,
+              isSlaBreached: t.isSlaBreached,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTickets');
         }
-
-        return tickets.map((t: Ticket) => ({
-          id: t.id,
-          summary: t.summary,
-          status: t.statusName,
-          priority: t.priorityName,
-          client: t.clientName,
-          agent: t.agentName,
-          created: t.dateCreated,
-          isSlaBreached: t.isSlaBreached,
-        }));
       },
     }),
 
@@ -56,28 +89,33 @@ export function createTicketTools(ctx: HaloContext) {
         ticketId: z.number().describe('The ticket ID to retrieve'),
       }),
       execute: async ({ ticketId }) => {
-        const ticket = await ctx.tickets.getWithActions(ticketId);
-        return {
-          id: ticket.id,
-          summary: ticket.summary,
-          details: ticket.details,
-          status: ticket.statusName,
-          priority: ticket.priorityName,
-          client: ticket.clientName,
-          site: ticket.siteName,
-          user: ticket.userName,
-          agent: ticket.agentName,
-          team: ticket.teamName,
-          created: ticket.dateCreated,
-          closed: ticket.dateClosed,
-          isSlaBreached: ticket.isSlaBreached,
-          actions: (ticket.actions || []).slice(0, DEFAULT_ACTION_LIMIT).map((a: Action) => ({
-            id: a.id,
-            note: a.note,
-            who: a.who,
-            time: a.actionTime,
-          })),
-        };
+        try {
+          const ticket = await ctx.tickets.getWithActions(ticketId);
+          return {
+            success: true,
+            id: ticket.id,
+            summary: ticket.summary,
+            details: ticket.details,
+            status: ticket.statusName,
+            priority: ticket.priorityName,
+            client: ticket.clientName,
+            site: ticket.siteName,
+            user: ticket.userName,
+            agent: ticket.agentName,
+            team: ticket.teamName,
+            created: ticket.dateCreated,
+            closed: ticket.dateClosed,
+            isSlaBreached: ticket.isSlaBreached,
+            actions: (ticket.actions || []).slice(0, DEFAULT_ACTION_LIMIT).map((a: Action) => ({
+              id: a.id,
+              note: a.note,
+              who: a.who,
+              time: a.actionTime,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'getTicket');
+        }
       },
     }),
 
@@ -88,7 +126,12 @@ export function createTicketTools(ctx: HaloContext) {
         agentId: z.number().optional().describe('Filter stats by agent ID'),
       }),
       execute: async ({ clientId, agentId }) => {
-        return ctx.tickets.getSummaryStats({ clientId, agentId });
+        try {
+          const stats = await ctx.tickets.getSummaryStats({ clientId, agentId });
+          return { success: true, ...stats };
+        } catch (error) {
+          return formatError(error, 'getTicketStats');
+        }
       },
     }),
 
@@ -98,15 +141,22 @@ export function createTicketTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number of tickets to return'),
       }),
       execute: async ({ count }) => {
-        const tickets = await ctx.tickets.listSlaBreached(count || DEFAULT_COUNT);
-        return tickets.map((t: Ticket) => ({
-          id: t.id,
-          summary: t.summary,
-          status: t.statusName,
-          client: t.clientName,
-          agent: t.agentName,
-          created: t.dateCreated,
-        }));
+        try {
+          const tickets = await ctx.tickets.listSlaBreached(count || DEFAULT_COUNT);
+          return {
+            success: true,
+            tickets: tickets.map((t: Ticket) => ({
+              id: t.id,
+              summary: t.summary,
+              status: t.statusName,
+              client: t.clientName,
+              agent: t.agentName,
+              created: t.dateCreated,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listSlaBreachedTickets');
+        }
       },
     }),
 
@@ -116,14 +166,21 @@ export function createTicketTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number of tickets to return'),
       }),
       execute: async ({ count }) => {
-        const tickets = await ctx.tickets.listUnassigned(count || DEFAULT_COUNT);
-        return tickets.map((t: Ticket) => ({
-          id: t.id,
-          summary: t.summary,
-          status: t.statusName,
-          client: t.clientName,
-          created: t.dateCreated,
-        }));
+        try {
+          const tickets = await ctx.tickets.listUnassigned(count || DEFAULT_COUNT);
+          return {
+            success: true,
+            tickets: tickets.map((t: Ticket) => ({
+              id: t.id,
+              summary: t.summary,
+              status: t.statusName,
+              client: t.clientName,
+              created: t.dateCreated,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listUnassignedTickets');
+        }
       },
     }),
 
@@ -136,8 +193,12 @@ export function createTicketTools(ctx: HaloContext) {
         hiddenFromUser: z.boolean().optional().default(false).describe('Whether to hide this note from the end user'),
       }),
       execute: async ({ ticketId, note, hiddenFromUser }) => {
-        const action = await ctx.tickets.addAction(ticketId, note, { hiddenFromUser: hiddenFromUser || false });
-        return { success: true, actionId: action.id };
+        try {
+          const action = await ctx.tickets.addAction(ticketId, note, { hiddenFromUser: hiddenFromUser || false });
+          return { success: true, actionId: action.id, message: `Note added to ticket #${ticketId}` };
+        } catch (error) {
+          return formatError(error, 'addTicketNote');
+        }
       },
     }),
 
@@ -157,34 +218,38 @@ export function createTicketTools(ctx: HaloContext) {
         category2: z.string().optional().describe('Secondary category'),
       }),
       execute: async ({ summary, details, clientId, ticketTypeId, priorityId, userId, siteId, agentId, teamId, category1, category2 }) => {
-        const ticketData: Record<string, unknown> = {
-          summary,
-          details,
-          clientId,
-          tickettypeId: ticketTypeId || 1,
-          priorityId: priorityId || 3,
-        };
-
-        if (userId) ticketData.userId = userId;
-        if (siteId) ticketData.siteId = siteId;
-        if (agentId) ticketData.agentId = agentId;
-        if (teamId) ticketData.teamId = teamId;
-        if (category1) ticketData.category1 = category1;
-        if (category2) ticketData.category2 = category2;
-
-        const tickets = await ctx.tickets.create([ticketData]);
-        if (tickets && tickets.length > 0) {
-          const t = tickets[0];
-          return {
-            success: true,
-            ticketId: t.id,
-            summary: t.summary,
-            client: t.clientName,
-            status: t.statusName,
-            message: `Ticket #${t.id} created successfully`,
+        try {
+          const ticketData: Record<string, unknown> = {
+            summary,
+            details,
+            clientId,
+            tickettypeId: ticketTypeId || 1,
+            priorityId: priorityId || 3,
           };
+
+          if (userId) ticketData.userId = userId;
+          if (siteId) ticketData.siteId = siteId;
+          if (agentId) ticketData.agentId = agentId;
+          if (teamId) ticketData.teamId = teamId;
+          if (category1) ticketData.category1 = category1;
+          if (category2) ticketData.category2 = category2;
+
+          const tickets = await ctx.tickets.create([ticketData]);
+          if (tickets && tickets.length > 0) {
+            const t = tickets[0];
+            return {
+              success: true,
+              ticketId: t.id,
+              summary: t.summary,
+              client: t.clientName,
+              status: t.statusName,
+              message: `Ticket #${t.id} created successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to create ticket - no response from HaloPSA' };
+        } catch (error) {
+          return formatError(error, 'createTicket');
         }
-        return { success: false, error: 'Failed to create ticket' };
       },
     }),
 
@@ -202,29 +267,33 @@ export function createTicketTools(ctx: HaloContext) {
         category2: z.string().optional().describe('New secondary category'),
       }),
       execute: async ({ ticketId, summary, details, statusId, priorityId, agentId, teamId, category1, category2 }) => {
-        const updateData: Record<string, unknown> = { id: ticketId };
+        try {
+          const updateData: Record<string, unknown> = { id: ticketId };
 
-        if (summary !== undefined) updateData.summary = summary;
-        if (details !== undefined) updateData.details = details;
-        if (statusId !== undefined) updateData.statusId = statusId;
-        if (priorityId !== undefined) updateData.priorityId = priorityId;
-        if (agentId !== undefined) updateData.agentId = agentId;
-        if (teamId !== undefined) updateData.teamId = teamId;
-        if (category1 !== undefined) updateData.category1 = category1;
-        if (category2 !== undefined) updateData.category2 = category2;
+          if (summary !== undefined) updateData.summary = summary;
+          if (details !== undefined) updateData.details = details;
+          if (statusId !== undefined) updateData.statusId = statusId;
+          if (priorityId !== undefined) updateData.priorityId = priorityId;
+          if (agentId !== undefined) updateData.agentId = agentId;
+          if (teamId !== undefined) updateData.teamId = teamId;
+          if (category1 !== undefined) updateData.category1 = category1;
+          if (category2 !== undefined) updateData.category2 = category2;
 
-        const tickets = await ctx.tickets.update([updateData]);
-        if (tickets && tickets.length > 0) {
-          const t = tickets[0];
-          return {
-            success: true,
-            ticketId: t.id,
-            summary: t.summary,
-            status: t.statusName,
-            message: `Ticket #${t.id} updated successfully`,
-          };
+          const tickets = await ctx.tickets.update([updateData]);
+          if (tickets && tickets.length > 0) {
+            const t = tickets[0];
+            return {
+              success: true,
+              ticketId: t.id,
+              summary: t.summary,
+              status: t.statusName,
+              message: `Ticket #${t.id} updated successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to update ticket - no response from HaloPSA' };
+        } catch (error) {
+          return formatError(error, 'updateTicket');
         }
-        return { success: false, error: 'Failed to update ticket' };
       },
     }),
 
@@ -236,14 +305,18 @@ export function createTicketTools(ctx: HaloContext) {
         teamId: z.number().optional().describe('Team ID to assign to'),
       }),
       execute: async ({ ticketId, agentId, teamId }) => {
-        const ticket = await ctx.tickets.assign(ticketId, { agentId, teamId });
-        return {
-          success: true,
-          ticketId: ticket.id,
-          agent: ticket.agentName,
-          team: ticket.teamName,
-          message: `Ticket #${ticket.id} assigned successfully`,
-        };
+        try {
+          const ticket = await ctx.tickets.assign(ticketId, { agentId, teamId });
+          return {
+            success: true,
+            ticketId: ticket.id,
+            agent: ticket.agentName,
+            team: ticket.teamName,
+            message: `Ticket #${ticket.id} assigned successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'assignTicket');
+        }
       },
     }),
 
@@ -254,13 +327,17 @@ export function createTicketTools(ctx: HaloContext) {
         note: z.string().optional().describe('Closing note/resolution'),
       }),
       execute: async ({ ticketId, note }) => {
-        const ticket = await ctx.tickets.close(ticketId, note);
-        return {
-          success: true,
-          ticketId: ticket.id,
-          status: ticket.statusName,
-          message: `Ticket #${ticket.id} closed successfully`,
-        };
+        try {
+          const ticket = await ctx.tickets.close(ticketId, note);
+          return {
+            success: true,
+            ticketId: ticket.id,
+            status: ticket.statusName,
+            message: `Ticket #${ticket.id} closed successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'closeTicket');
+        }
       },
     }),
 
@@ -272,21 +349,25 @@ export function createTicketTools(ctx: HaloContext) {
         note: z.string().optional().describe('Note explaining the status change'),
       }),
       execute: async ({ ticketId, statusId, note }) => {
-        if (note) {
-          await ctx.tickets.addAction(ticketId, note, { hiddenFromUser: false });
-        }
+        try {
+          if (note) {
+            await ctx.tickets.addAction(ticketId, note, { hiddenFromUser: false });
+          }
 
-        const tickets = await ctx.tickets.update([{ id: ticketId, statusId }]);
-        if (tickets && tickets.length > 0) {
-          const t = tickets[0];
-          return {
-            success: true,
-            ticketId: t.id,
-            status: t.statusName,
-            message: `Ticket #${t.id} status changed successfully`,
-          };
+          const tickets = await ctx.tickets.update([{ id: ticketId, statusId }]);
+          if (tickets && tickets.length > 0) {
+            const t = tickets[0];
+            return {
+              success: true,
+              ticketId: t.id,
+              status: t.statusName,
+              message: `Ticket #${t.id} status changed successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to change ticket status' };
+        } catch (error) {
+          return formatError(error, 'changeTicketStatus');
         }
-        return { success: false, error: 'Failed to change ticket status' };
       },
     }),
 
@@ -297,17 +378,21 @@ export function createTicketTools(ctx: HaloContext) {
         priorityId: z.number().describe('New priority ID (1=P1 Critical, 2=P2 High, 3=P3 Medium, 4=P4 Low)'),
       }),
       execute: async ({ ticketId, priorityId }) => {
-        const tickets = await ctx.tickets.update([{ id: ticketId, priorityId }]);
-        if (tickets && tickets.length > 0) {
-          const t = tickets[0];
-          return {
-            success: true,
-            ticketId: t.id,
-            priority: t.priorityName,
-            message: `Ticket #${t.id} priority changed successfully`,
-          };
+        try {
+          const tickets = await ctx.tickets.update([{ id: ticketId, priorityId }]);
+          if (tickets && tickets.length > 0) {
+            const t = tickets[0];
+            return {
+              success: true,
+              ticketId: t.id,
+              priority: t.priorityName,
+              message: `Ticket #${t.id} priority changed successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to change ticket priority' };
+        } catch (error) {
+          return formatError(error, 'changeTicketPriority');
         }
-        return { success: false, error: 'Failed to change ticket priority' };
       },
     }),
 
@@ -322,20 +407,24 @@ export function createTicketTools(ctx: HaloContext) {
         teamId: z.number().optional().describe('New team ID for all tickets'),
       }),
       execute: async ({ ticketIds, statusId, priorityId, agentId, teamId }) => {
-        const updateData: Record<string, unknown> = {};
-        if (statusId !== undefined) updateData.statusId = statusId;
-        if (priorityId !== undefined) updateData.priorityId = priorityId;
-        if (agentId !== undefined) updateData.agentId = agentId;
-        if (teamId !== undefined) updateData.teamId = teamId;
+        try {
+          const updateData: Record<string, unknown> = {};
+          if (statusId !== undefined) updateData.statusId = statusId;
+          if (priorityId !== undefined) updateData.priorityId = priorityId;
+          if (agentId !== undefined) updateData.agentId = agentId;
+          if (teamId !== undefined) updateData.teamId = teamId;
 
-        const updates = ticketIds.map(id => ({ id, ...updateData }));
-        const tickets = await ctx.tickets.update(updates);
+          const updates = ticketIds.map(id => ({ id, ...updateData }));
+          const tickets = await ctx.tickets.update(updates);
 
-        return {
-          success: true,
-          updatedCount: tickets.length,
-          message: `Updated ${tickets.length} tickets`,
-        };
+          return {
+            success: true,
+            updatedCount: tickets.length,
+            message: `Updated ${tickets.length} tickets`,
+          };
+        } catch (error) {
+          return formatError(error, 'bulkUpdateTickets');
+        }
       },
     }),
 
@@ -346,17 +435,21 @@ export function createTicketTools(ctx: HaloContext) {
         note: z.string().optional().describe('Closing note for all tickets'),
       }),
       execute: async ({ ticketIds, note }) => {
-        const results = [];
-        for (const ticketId of ticketIds) {
-          const ticket = await ctx.tickets.close(ticketId, note);
-          results.push(ticket.id);
-        }
+        try {
+          const results = [];
+          for (const ticketId of ticketIds) {
+            const ticket = await ctx.tickets.close(ticketId, note);
+            results.push(ticket.id);
+          }
 
-        return {
-          success: true,
-          closedCount: results.length,
-          message: `Closed ${results.length} tickets`,
-        };
+          return {
+            success: true,
+            closedCount: results.length,
+            message: `Closed ${results.length} tickets`,
+          };
+        } catch (error) {
+          return formatError(error, 'bulkCloseTickets');
+        }
       },
     }),
 
@@ -369,15 +462,19 @@ export function createTicketTools(ctx: HaloContext) {
         mergeNote: z.string().optional().describe('Note explaining the merge'),
       }),
       execute: async ({ primaryTicketId, secondaryTicketIds, mergeNote }) => {
-        const result = await ctx.tickets.mergeTickets(primaryTicketId, secondaryTicketIds, mergeNote);
-        return {
-          success: result.errors.length === 0,
-          primaryTicketId,
-          mergedCount: result.mergedTickets.length,
-          actionsCopied: result.actionsCopied,
-          errors: result.errors,
-          message: `Merged ${result.mergedTickets.length} tickets into #${primaryTicketId}. ${result.actionsCopied} actions copied.`,
-        };
+        try {
+          const result = await ctx.tickets.mergeTickets(primaryTicketId, secondaryTicketIds, mergeNote);
+          return {
+            success: result.errors.length === 0,
+            primaryTicketId,
+            mergedCount: result.mergedTickets.length,
+            actionsCopied: result.actionsCopied,
+            errors: result.errors,
+            message: `Merged ${result.mergedTickets.length} tickets into #${primaryTicketId}. ${result.actionsCopied} actions copied.`,
+          };
+        } catch (error) {
+          return formatError(error, 'mergeTickets');
+        }
       },
     }),
 
@@ -389,10 +486,15 @@ export function createTicketTools(ctx: HaloContext) {
         similarityThreshold: z.number().optional().default(0.7).describe('Similarity threshold (0-1)'),
       }),
       execute: async ({ ticketId, hoursLookback, similarityThreshold }) => {
-        return ctx.tickets.findDuplicates(ticketId, {
-          hoursLookback: hoursLookback || 72,
-          similarityThreshold: similarityThreshold || 0.7,
-        });
+        try {
+          const duplicates = await ctx.tickets.findDuplicates(ticketId, {
+            hoursLookback: hoursLookback || 72,
+            similarityThreshold: similarityThreshold || 0.7,
+          });
+          return { success: true, ...duplicates };
+        } catch (error) {
+          return formatError(error, 'findDuplicateTickets');
+        }
       },
     }),
   };

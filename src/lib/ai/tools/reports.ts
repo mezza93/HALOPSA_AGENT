@@ -10,6 +10,33 @@ import type { Report, ScheduledReport, Dashboard, DashboardWidget } from '@/lib/
 const DEFAULT_COUNT = 20;
 const MAX_REPORT_ROWS = 100;
 
+/**
+ * Format error for tool response.
+ */
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  // Check for specific error types
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 export function createReportTools(ctx: HaloContext) {
   return {
     // === REPORT OPERATIONS ===
@@ -20,17 +47,24 @@ export function createReportTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ category, count }) => {
-        const reports = category
-          ? await ctx.reports.listByCategory(category, count || DEFAULT_COUNT)
-          : await ctx.reports.list({ count: count || DEFAULT_COUNT });
+        try {
+          const reports = category
+            ? await ctx.reports.listByCategory(category, count || DEFAULT_COUNT)
+            : await ctx.reports.list({ count: count || DEFAULT_COUNT });
 
-        return reports.map((r: Report) => ({
-          id: r.id,
-          name: r.name,
-          category: r.category,
-          description: r.description,
-          isShared: r.isShared,
-        }));
+          return {
+            success: true,
+            reports: reports.map((r: Report) => ({
+              id: r.id,
+              name: r.name,
+              category: r.category,
+              description: r.description,
+              isShared: r.isShared,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listReports');
+        }
       },
     }),
 
@@ -40,18 +74,23 @@ export function createReportTools(ctx: HaloContext) {
         reportId: z.number().describe('The report ID'),
       }),
       execute: async ({ reportId }) => {
-        const report = await ctx.reports.get(reportId);
-        return {
-          id: report.id,
-          name: report.name,
-          description: report.description,
-          category: report.category,
-          sqlQuery: report.sqlQuery,
-          isShared: report.isShared,
-          authorName: report.authorName,
-          dateCreated: report.dateCreated,
-          dateModified: report.dateModified,
-        };
+        try {
+          const report = await ctx.reports.get(reportId);
+          return {
+            success: true,
+            id: report.id,
+            name: report.name,
+            description: report.description,
+            category: report.category,
+            sqlQuery: report.sqlQuery,
+            isShared: report.isShared,
+            authorName: report.authorName,
+            dateCreated: report.dateCreated,
+            dateModified: report.dateModified,
+          };
+        } catch (error) {
+          return formatError(error, 'getReport');
+        }
       },
     }),
 
@@ -63,16 +102,21 @@ export function createReportTools(ctx: HaloContext) {
         endDate: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
       }),
       execute: async ({ reportId, startDate, endDate }) => {
-        const result = await ctx.reports.run(reportId, { startDate, endDate });
+        try {
+          const result = await ctx.reports.run(reportId, { startDate, endDate });
 
-        return {
-          reportId: result.reportId,
-          reportName: result.reportName,
-          columns: result.columns,
-          rows: result.rows.slice(0, MAX_REPORT_ROWS),
-          rowCount: result.rowCount,
-          executedAt: result.executedAt,
-        };
+          return {
+            success: true,
+            reportId: result.reportId,
+            reportName: result.reportName,
+            columns: result.columns,
+            rows: result.rows.slice(0, MAX_REPORT_ROWS),
+            rowCount: result.rowCount,
+            executedAt: result.executedAt,
+          };
+        } catch (error) {
+          return formatError(error, 'runReport');
+        }
       },
     }),
 
@@ -85,16 +129,21 @@ export function createReportTools(ctx: HaloContext) {
         endDate: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
       }),
       execute: async ({ reportId, format, startDate, endDate }) => {
-        const data = await ctx.reports.export(reportId, {
-          format: format || 'csv',
-          startDate,
-          endDate,
-        });
+        try {
+          const data = await ctx.reports.export(reportId, {
+            format: format || 'csv',
+            startDate,
+            endDate,
+          });
 
-        return {
-          format: format || 'csv',
-          data,
-        };
+          return {
+            success: true,
+            format: format || 'csv',
+            data,
+          };
+        } catch (error) {
+          return formatError(error, 'exportReport');
+        }
       },
     }),
 
@@ -108,20 +157,24 @@ export function createReportTools(ctx: HaloContext) {
         isShared: z.boolean().optional().default(false).describe('Whether to share with other users'),
       }),
       execute: async ({ name, sqlQuery, description, category, isShared }) => {
-        const report = await ctx.reports.createCustomReport({
-          name,
-          sqlQuery,
-          description,
-          category,
-          isShared: isShared || false,
-        });
+        try {
+          const report = await ctx.reports.createCustomReport({
+            name,
+            sqlQuery,
+            description,
+            category,
+            isShared: isShared || false,
+          });
 
-        return {
-          success: true,
-          reportId: report.id,
-          name: report.name,
-          message: `Report '${report.name}' created successfully`,
-        };
+          return {
+            success: true,
+            reportId: report.id,
+            name: report.name,
+            message: `Report '${report.name}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createReport');
+        }
       },
     }),
 
@@ -136,23 +189,27 @@ export function createReportTools(ctx: HaloContext) {
         isShared: z.boolean().optional().describe('Whether to share with other users'),
       }),
       execute: async ({ reportId, name, sqlQuery, description, category, isShared }) => {
-        const updateData: Record<string, unknown> = { id: reportId };
-        if (name !== undefined) updateData.name = name;
-        if (sqlQuery !== undefined) updateData.sqlQuery = sqlQuery;
-        if (description !== undefined) updateData.description = description;
-        if (category !== undefined) updateData.category = category;
-        if (isShared !== undefined) updateData.isShared = isShared;
+        try {
+          const updateData: Record<string, unknown> = { id: reportId };
+          if (name !== undefined) updateData.name = name;
+          if (sqlQuery !== undefined) updateData.sqlQuery = sqlQuery;
+          if (description !== undefined) updateData.description = description;
+          if (category !== undefined) updateData.category = category;
+          if (isShared !== undefined) updateData.isShared = isShared;
 
-        const reports = await ctx.reports.update([updateData]);
-        if (reports && reports.length > 0) {
-          return {
-            success: true,
-            reportId: reports[0].id,
-            name: reports[0].name,
-            message: `Report updated successfully`,
-          };
+          const reports = await ctx.reports.update([updateData]);
+          if (reports && reports.length > 0) {
+            return {
+              success: true,
+              reportId: reports[0].id,
+              name: reports[0].name,
+              message: `Report updated successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to update report' };
+        } catch (error) {
+          return formatError(error, 'updateReport');
         }
-        return { success: false, error: 'Failed to update report' };
       },
     }),
 
@@ -162,12 +219,16 @@ export function createReportTools(ctx: HaloContext) {
         reportId: z.number().describe('The report ID to delete'),
       }),
       execute: async ({ reportId }) => {
-        await ctx.reports.delete(reportId);
-        return {
-          success: true,
-          reportId,
-          message: `Report ${reportId} deleted successfully`,
-        };
+        try {
+          await ctx.reports.delete(reportId);
+          return {
+            success: true,
+            reportId,
+            message: `Report ${reportId} deleted successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'deleteReport');
+        }
       },
     }),
 
@@ -181,27 +242,32 @@ export function createReportTools(ctx: HaloContext) {
         agentId: z.number().optional().describe('Filter by agent ID'),
       }),
       execute: async ({ reportName, startDate, endDate, clientId, agentId }) => {
-        // First find the report by name
-        const reports = await ctx.reports.list({ search: reportName, count: 10 });
-        const report = reports.find((r: Report) => r.name.toLowerCase().includes(reportName.toLowerCase()));
+        try {
+          // First find the report by name
+          const reports = await ctx.reports.list({ search: reportName, count: 10 });
+          const report = reports.find((r: Report) => r.name.toLowerCase().includes(reportName.toLowerCase()));
 
-        if (!report) {
+          if (!report) {
+            return {
+              success: false,
+              error: `Report '${reportName}' not found`,
+            };
+          }
+
+          const result = await ctx.reports.run(report.id, { startDate, endDate, clientId, agentId });
+
           return {
-            success: false,
-            error: `Report '${reportName}' not found`,
+            success: true,
+            reportId: report.id,
+            reportName: report.name,
+            columns: result.columns,
+            rows: result.rows.slice(0, MAX_REPORT_ROWS),
+            rowCount: result.rowCount,
+            executedAt: result.executedAt,
           };
+        } catch (error) {
+          return formatError(error, 'runSavedReport');
         }
-
-        const result = await ctx.reports.run(report.id, { startDate, endDate, clientId, agentId });
-
-        return {
-          reportId: report.id,
-          reportName: report.name,
-          columns: result.columns,
-          rows: result.rows.slice(0, MAX_REPORT_ROWS),
-          rowCount: result.rowCount,
-          executedAt: result.executedAt,
-        };
       },
     }),
 
@@ -212,20 +278,27 @@ export function createReportTools(ctx: HaloContext) {
         reportId: z.number().optional().describe('Filter by report ID'),
       }),
       execute: async ({ reportId }) => {
-        const schedules = reportId
-          ? await ctx.reports.scheduledReports.listByReport(reportId)
-          : await ctx.reports.scheduledReports.list();
+        try {
+          const schedules = reportId
+            ? await ctx.reports.scheduledReports.listByReport(reportId)
+            : await ctx.reports.scheduledReports.list();
 
-        return schedules.map((s: ScheduledReport) => ({
-          id: s.id,
-          name: s.name,
-          reportId: s.reportId,
-          reportName: s.reportName,
-          frequency: s.frequency,
-          outputFormat: s.outputFormat,
-          nextRun: s.nextRun,
-          isActive: s.isActive,
-        }));
+          return {
+            success: true,
+            schedules: schedules.map((s: ScheduledReport) => ({
+              id: s.id,
+              name: s.name,
+              reportId: s.reportId,
+              reportName: s.reportName,
+              frequency: s.frequency,
+              outputFormat: s.outputFormat,
+              nextRun: s.nextRun,
+              isActive: s.isActive,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listScheduledReports');
+        }
       },
     }),
 
@@ -242,23 +315,27 @@ export function createReportTools(ctx: HaloContext) {
         dayOfMonth: z.number().optional().describe('Day of month for monthly (1-31)'),
       }),
       execute: async ({ reportId, name, frequency, recipients, outputFormat, timeOfDay, dayOfWeek, dayOfMonth }) => {
-        const schedule = await ctx.reports.scheduledReports.schedule({
-          reportId,
-          name,
-          frequency,
-          recipients,
-          outputFormat: outputFormat || 'pdf',
-          timeOfDay: timeOfDay || '08:00',
-          dayOfWeek,
-          dayOfMonth,
-        });
+        try {
+          const schedule = await ctx.reports.scheduledReports.schedule({
+            reportId,
+            name,
+            frequency,
+            recipients,
+            outputFormat: outputFormat || 'pdf',
+            timeOfDay: timeOfDay || '08:00',
+            dayOfWeek,
+            dayOfMonth,
+          });
 
-        return {
-          success: true,
-          scheduleId: schedule.id,
-          name: schedule.name,
-          nextRun: schedule.nextRun,
-        };
+          return {
+            success: true,
+            scheduleId: schedule.id,
+            name: schedule.name,
+            nextRun: schedule.nextRun,
+          };
+        } catch (error) {
+          return formatError(error, 'createScheduledReport');
+        }
       },
     }),
 
@@ -269,16 +346,23 @@ export function createReportTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const dashboards = await ctx.reports.dashboards.listShared(count || DEFAULT_COUNT);
+        try {
+          const dashboards = await ctx.reports.dashboards.listShared(count || DEFAULT_COUNT);
 
-        return dashboards.map((d: Dashboard) => ({
-          id: d.id,
-          name: d.name,
-          description: d.description,
-          isShared: d.isShared,
-          isDefault: d.isDefault,
-          widgetCount: d.widgets?.length || 0,
-        }));
+          return {
+            success: true,
+            dashboards: dashboards.map((d: Dashboard) => ({
+              id: d.id,
+              name: d.name,
+              description: d.description,
+              isShared: d.isShared,
+              isDefault: d.isDefault,
+              widgetCount: d.widgets?.length || 0,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listDashboards');
+        }
       },
     }),
 
@@ -288,27 +372,32 @@ export function createReportTools(ctx: HaloContext) {
         dashboardId: z.number().describe('The dashboard ID'),
       }),
       execute: async ({ dashboardId }) => {
-        const dashboard = await ctx.reports.dashboards.get(dashboardId);
+        try {
+          const dashboard = await ctx.reports.dashboards.get(dashboardId);
 
-        return {
-          id: dashboard.id,
-          name: dashboard.name,
-          description: dashboard.description,
-          isShared: dashboard.isShared,
-          isDefault: dashboard.isDefault,
-          authorName: dashboard.authorName,
-          widgets: (dashboard.widgets || []).map((w: DashboardWidget) => ({
-            id: w.id,
-            name: w.name,
-            widgetType: w.widgetType,
-            reportId: w.reportId,
-            filterId: w.filterId,
-            width: w.width,
-            height: w.height,
-            positionX: w.positionX,
-            positionY: w.positionY,
-          })),
-        };
+          return {
+            success: true,
+            id: dashboard.id,
+            name: dashboard.name,
+            description: dashboard.description,
+            isShared: dashboard.isShared,
+            isDefault: dashboard.isDefault,
+            authorName: dashboard.authorName,
+            widgets: (dashboard.widgets || []).map((w: DashboardWidget) => ({
+              id: w.id,
+              name: w.name,
+              widgetType: w.widgetType,
+              reportId: w.reportId,
+              filterId: w.filterId,
+              width: w.width,
+              height: w.height,
+              positionX: w.positionX,
+              positionY: w.positionY,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'getDashboard');
+        }
       },
     }),
 
@@ -320,22 +409,29 @@ export function createReportTools(ctx: HaloContext) {
         isShared: z.boolean().optional().default(true).describe('Whether to share with other users'),
       }),
       execute: async ({ name, description, isShared }) => {
-        const dashboardData: Record<string, unknown> = {
-          name,
-          isShared: isShared !== false,
-        };
-
-        if (description) dashboardData.description = description;
-
-        const dashboards = await ctx.reports.dashboards.create([dashboardData]);
-        if (dashboards && dashboards.length > 0) {
-          return {
-            success: true,
-            dashboardId: dashboards[0].id,
-            name: dashboards[0].name,
+        try {
+          console.log(`[Tool:createDashboard] Creating dashboard: ${name}`);
+          const dashboardData: Record<string, unknown> = {
+            name,
+            isShared: isShared !== false,
           };
+
+          if (description) dashboardData.description = description;
+
+          const dashboards = await ctx.reports.dashboards.create([dashboardData]);
+          if (dashboards && dashboards.length > 0) {
+            console.log(`[Tool:createDashboard] Successfully created dashboard ID: ${dashboards[0].id}`);
+            return {
+              success: true,
+              dashboardId: dashboards[0].id,
+              name: dashboards[0].name,
+              message: `Dashboard '${dashboards[0].name}' created successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to create dashboard - no response from HaloPSA' };
+        } catch (error) {
+          return formatError(error, 'createDashboard');
         }
-        return { success: false, error: 'Failed to create dashboard' };
       },
     }),
 
@@ -355,25 +451,31 @@ export function createReportTools(ctx: HaloContext) {
         colour: z.string().optional().describe('Widget color (hex code)'),
       }),
       execute: async ({ dashboardId, name, widgetType, reportId, filterId, ticketAreaId, width, height, positionX, positionY, colour }) => {
-        const widget = await ctx.reports.dashboards.addWidget(dashboardId, {
-          name,
-          widgetType,
-          reportId,
-          filterId,
-          ticketAreaId,
-          width: width || 4,
-          height: height || 2,
-          positionX: positionX || 0,
-          positionY: positionY || 0,
-          colour,
-        });
+        try {
+          console.log(`[Tool:addDashboardWidget] Adding widget '${name}' to dashboard ${dashboardId}`);
+          const widget = await ctx.reports.dashboards.addWidget(dashboardId, {
+            name,
+            widgetType,
+            reportId,
+            filterId,
+            ticketAreaId,
+            width: width || 4,
+            height: height || 2,
+            positionX: positionX || 0,
+            positionY: positionY || 0,
+            colour,
+          });
 
-        return {
-          success: true,
-          widgetId: widget.id,
-          dashboardId,
-          message: `Widget '${name}' added to dashboard`,
-        };
+          console.log(`[Tool:addDashboardWidget] Successfully added widget ID: ${widget.id}`);
+          return {
+            success: true,
+            widgetId: widget.id,
+            dashboardId,
+            message: `Widget '${name}' added to dashboard`,
+          };
+        } catch (error) {
+          return formatError(error, 'addDashboardWidget');
+        }
       },
     }),
   };

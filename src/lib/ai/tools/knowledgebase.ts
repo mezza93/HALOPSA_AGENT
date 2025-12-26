@@ -7,6 +7,29 @@ import { z } from 'zod';
 import type { HaloContext } from './context';
 import type { KBArticle, FAQ, KBSuggestion } from '@/lib/halopsa/types';
 
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 const DEFAULT_COUNT = 20;
 const DEFAULT_SUGGESTION_COUNT = 5;
 
@@ -21,17 +44,24 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ categoryId, isPublished, count }) => {
-        const articles = isPublished
-          ? await ctx.kb.listPublished({ categoryId, count: count || DEFAULT_COUNT })
-          : await ctx.kb.list({ categoryId, isPublished, count: count || DEFAULT_COUNT });
+        try {
+          const articles = isPublished
+            ? await ctx.kb.listPublished({ categoryId, count: count || DEFAULT_COUNT })
+            : await ctx.kb.list({ categoryId, isPublished, count: count || DEFAULT_COUNT });
 
-        return articles.map((a: KBArticle) => ({
-          id: a.id,
-          title: a.title,
-          category: a.categoryName,
-          isPublished: a.isPublished,
-          viewCount: a.viewCount,
-        }));
+          return {
+            success: true,
+            articles: articles.map((a: KBArticle) => ({
+              id: a.id,
+              title: a.title,
+              category: a.categoryName,
+              isPublished: a.isPublished,
+              viewCount: a.viewCount,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listKbArticles');
+        }
       },
     }),
 
@@ -41,20 +71,25 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         articleId: z.number().describe('The article ID'),
       }),
       execute: async ({ articleId }) => {
-        const article = await ctx.kb.get(articleId);
-        return {
-          id: article.id,
-          title: article.title,
-          content: article.content,
-          summary: article.summary,
-          category: article.categoryName,
-          keywords: article.keywords,
-          viewCount: article.viewCount,
-          isPublished: article.isPublished,
-          isPublic: article.isPublic,
-          dateCreated: article.dateCreated,
-          dateModified: article.dateModified,
-        };
+        try {
+          const article = await ctx.kb.get(articleId);
+          return {
+            success: true,
+            id: article.id,
+            title: article.title,
+            content: article.content,
+            summary: article.summary,
+            category: article.categoryName,
+            keywords: article.keywords,
+            viewCount: article.viewCount,
+            isPublished: article.isPublished,
+            isPublic: article.isPublic,
+            dateCreated: article.dateCreated,
+            dateModified: article.dateModified,
+          };
+        } catch (error) {
+          return formatError(error, 'getKbArticle');
+        }
       },
     }),
 
@@ -65,14 +100,21 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         count: z.number().optional().default(10).describe('Maximum number to return'),
       }),
       execute: async ({ query, count }) => {
-        const articles = await ctx.kb.search(query, { count: count || 10 });
+        try {
+          const articles = await ctx.kb.search(query, { count: count || 10 });
 
-        return articles.map((a: KBArticle) => ({
-          id: a.id,
-          title: a.title,
-          summary: a.summary,
-          category: a.categoryName,
-        }));
+          return {
+            success: true,
+            articles: articles.map((a: KBArticle) => ({
+              id: a.id,
+              title: a.title,
+              summary: a.summary,
+              category: a.categoryName,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'searchKbArticles');
+        }
       },
     }),
 
@@ -85,18 +127,25 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_SUGGESTION_COUNT).describe('Maximum suggestions to return'),
       }),
       execute: async ({ ticketId, summary, details, count }) => {
-        const suggestions = await ctx.kb.getSuggestions({
-          ticketId,
-          summary,
-          details,
-          count: count || DEFAULT_SUGGESTION_COUNT,
-        });
+        try {
+          const suggestions = await ctx.kb.getSuggestions({
+            ticketId,
+            summary,
+            details,
+            count: count || DEFAULT_SUGGESTION_COUNT,
+          });
 
-        return suggestions.map((s: KBSuggestion) => ({
-          articleId: s.articleId,
-          title: s.title,
-          relevance: s.relevanceScore,
-        }));
+          return {
+            success: true,
+            suggestions: suggestions.map((s: KBSuggestion) => ({
+              articleId: s.articleId,
+              title: s.title,
+              relevance: s.relevanceScore,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'getKbSuggestions');
+        }
       },
     }),
 
@@ -112,26 +161,30 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         isPublished: z.boolean().optional().default(false).describe('Whether the article is published'),
       }),
       execute: async ({ title, content, categoryId, summary, keywords, isPublic, isPublished }) => {
-        const articleData: Record<string, unknown> = {
-          title,
-          content,
-          isPublic: isPublic || false,
-          isPublished: isPublished || false,
-        };
-
-        if (categoryId) articleData.categoryId = categoryId;
-        if (summary) articleData.summary = summary;
-        if (keywords) articleData.keywords = keywords;
-
-        const articles = await ctx.kb.create([articleData]);
-        if (articles && articles.length > 0) {
-          return {
-            success: true,
-            articleId: articles[0].id,
-            title: articles[0].title,
+        try {
+          const articleData: Record<string, unknown> = {
+            title,
+            content,
+            isPublic: isPublic || false,
+            isPublished: isPublished || false,
           };
+
+          if (categoryId) articleData.categoryId = categoryId;
+          if (summary) articleData.summary = summary;
+          if (keywords) articleData.keywords = keywords;
+
+          const articles = await ctx.kb.create([articleData]);
+          if (articles && articles.length > 0) {
+            return {
+              success: true,
+              articleId: articles[0].id,
+              title: articles[0].title,
+            };
+          }
+          return { success: false, error: 'Failed to create article' };
+        } catch (error) {
+          return formatError(error, 'createKbArticle');
         }
-        return { success: false, error: 'Failed to create article' };
       },
     }),
 
@@ -146,23 +199,27 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         isPublished: z.boolean().optional().describe('Published status'),
       }),
       execute: async ({ articleId, title, content, summary, keywords, isPublished }) => {
-        const updateData: Record<string, unknown> = { id: articleId };
+        try {
+          const updateData: Record<string, unknown> = { id: articleId };
 
-        if (title !== undefined) updateData.title = title;
-        if (content !== undefined) updateData.content = content;
-        if (summary !== undefined) updateData.summary = summary;
-        if (keywords !== undefined) updateData.keywords = keywords;
-        if (isPublished !== undefined) updateData.isPublished = isPublished;
+          if (title !== undefined) updateData.title = title;
+          if (content !== undefined) updateData.content = content;
+          if (summary !== undefined) updateData.summary = summary;
+          if (keywords !== undefined) updateData.keywords = keywords;
+          if (isPublished !== undefined) updateData.isPublished = isPublished;
 
-        const articles = await ctx.kb.update([updateData]);
-        if (articles && articles.length > 0) {
-          return {
-            success: true,
-            articleId: articles[0].id,
-            title: articles[0].title,
-          };
+          const articles = await ctx.kb.update([updateData]);
+          if (articles && articles.length > 0) {
+            return {
+              success: true,
+              articleId: articles[0].id,
+              title: articles[0].title,
+            };
+          }
+          return { success: false, error: 'Failed to update article' };
+        } catch (error) {
+          return formatError(error, 'updateKbArticle');
         }
-        return { success: false, error: 'Failed to update article' };
       },
     }),
 
@@ -170,7 +227,15 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
       description: 'Get knowledge base statistics including article counts by category.',
       parameters: z.object({}),
       execute: async () => {
-        return ctx.kb.getStats();
+        try {
+          const stats = await ctx.kb.getStats();
+          return {
+            success: true,
+            ...stats,
+          };
+        } catch (error) {
+          return formatError(error, 'getKbStats');
+        }
       },
     }),
 
@@ -183,17 +248,24 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ categoryId, isPublished, count }) => {
-        const faqs = await ctx.kb.faqs.list({
-          categoryId,
-          isPublished,
-          count: count || DEFAULT_COUNT,
-        });
+        try {
+          const faqs = await ctx.kb.faqs.list({
+            categoryId,
+            isPublished,
+            count: count || DEFAULT_COUNT,
+          });
 
-        return faqs.map((f: FAQ) => ({
-          id: f.id,
-          question: f.question,
-          answer: f.answer.length > 200 ? f.answer.slice(0, 200) + '...' : f.answer,
-        }));
+          return {
+            success: true,
+            faqs: faqs.map((f: FAQ) => ({
+              id: f.id,
+              question: f.question,
+              answer: f.answer.length > 200 ? f.answer.slice(0, 200) + '...' : f.answer,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listFaqs');
+        }
       },
     }),
 
@@ -207,24 +279,28 @@ export function createKnowledgeBaseTools(ctx: HaloContext) {
         isPublished: z.boolean().optional().default(false).describe('Whether published'),
       }),
       execute: async ({ question, answer, categoryId, isPublic, isPublished }) => {
-        const faqData: Record<string, unknown> = {
-          question,
-          answer,
-          isPublic: isPublic || false,
-          isPublished: isPublished || false,
-        };
-
-        if (categoryId) faqData.categoryId = categoryId;
-
-        const faqs = await ctx.kb.faqs.create([faqData]);
-        if (faqs && faqs.length > 0) {
-          return {
-            success: true,
-            faqId: faqs[0].id,
-            question: faqs[0].question,
+        try {
+          const faqData: Record<string, unknown> = {
+            question,
+            answer,
+            isPublic: isPublic || false,
+            isPublished: isPublished || false,
           };
+
+          if (categoryId) faqData.categoryId = categoryId;
+
+          const faqs = await ctx.kb.faqs.create([faqData]);
+          if (faqs && faqs.length > 0) {
+            return {
+              success: true,
+              faqId: faqs[0].id,
+              question: faqs[0].question,
+            };
+          }
+          return { success: false, error: 'Failed to create FAQ' };
+        } catch (error) {
+          return formatError(error, 'createFaq');
         }
-        return { success: false, error: 'Failed to create FAQ' };
       },
     }),
   };

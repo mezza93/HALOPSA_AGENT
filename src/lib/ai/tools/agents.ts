@@ -9,6 +9,32 @@ import type { Agent, AgentWorkload, Team } from '@/lib/halopsa/types';
 
 const DEFAULT_COUNT = 50;
 
+/**
+ * Format error for tool response.
+ */
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 export function createAgentTools(ctx: HaloContext) {
   return {
     listAgents: tool({
@@ -19,30 +45,40 @@ export function createAgentTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ includeWorkload, isActive, count }) => {
-        const agents = isActive
-          ? await ctx.agents.listActive(count || DEFAULT_COUNT)
-          : await ctx.agents.list({ count: count || DEFAULT_COUNT });
+        try {
+          const agents = isActive
+            ? await ctx.agents.listActive(count || DEFAULT_COUNT)
+            : await ctx.agents.list({ count: count || DEFAULT_COUNT });
 
-        if (includeWorkload) {
-          const workloads = await ctx.agents.getWorkloadStats();
-          return agents.map((a: Agent) => ({
-            id: a.id,
-            name: a.name,
-            email: a.email,
-            isActive: !a.inactive,
-            teams: a.teamNames,
-            openTickets: workloads.find((w: AgentWorkload) => w.agentId === a.id)?.openTickets || 0,
-            overdueTickets: workloads.find((w: AgentWorkload) => w.agentId === a.id)?.overdueTickets || 0,
-          }));
+          if (includeWorkload) {
+            const workloads = await ctx.agents.getWorkloadStats();
+            return {
+              success: true,
+              agents: agents.map((a: Agent) => ({
+                id: a.id,
+                name: a.name,
+                email: a.email,
+                isActive: !a.inactive,
+                teams: a.teamNames,
+                openTickets: workloads.find((w: AgentWorkload) => w.agentId === a.id)?.openTickets || 0,
+                overdueTickets: workloads.find((w: AgentWorkload) => w.agentId === a.id)?.overdueTickets || 0,
+              })),
+            };
+          }
+
+          return {
+            success: true,
+            agents: agents.map((a: Agent) => ({
+              id: a.id,
+              name: a.name,
+              email: a.email,
+              isActive: !a.inactive,
+              teams: a.teamNames,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listAgents');
         }
-
-        return agents.map((a: Agent) => ({
-          id: a.id,
-          name: a.name,
-          email: a.email,
-          isActive: !a.inactive,
-          teams: a.teamNames,
-        }));
       },
     }),
 
@@ -52,26 +88,31 @@ export function createAgentTools(ctx: HaloContext) {
         agentId: z.number().describe('The agent ID to retrieve'),
       }),
       execute: async ({ agentId }) => {
-        const agent = await ctx.agents.get(agentId);
-        const workload = await ctx.agents.getAgentWorkload(agentId);
+        try {
+          const agent = await ctx.agents.get(agentId);
+          const workload = await ctx.agents.getAgentWorkload(agentId);
 
-        return {
-          id: agent.id,
-          name: agent.name,
-          email: agent.email,
-          phone: agent.phoneNumber,
-          mobile: agent.mobileNumber,
-          isActive: !agent.inactive,
-          teams: agent.teamNames,
-          role: agent.role,
-          department: agent.departmentName,
-          workload: {
-            openTickets: workload.openTickets,
-            overdueTickets: workload.overdueTickets,
-            ticketsClosedToday: workload.ticketsClosedToday,
-            ticketsClosedThisWeek: workload.ticketsClosedThisWeek,
-          },
-        };
+          return {
+            success: true,
+            id: agent.id,
+            name: agent.name,
+            email: agent.email,
+            phone: agent.phoneNumber,
+            mobile: agent.mobileNumber,
+            isActive: !agent.inactive,
+            teams: agent.teamNames,
+            role: agent.role,
+            department: agent.departmentName,
+            workload: {
+              openTickets: workload.openTickets,
+              overdueTickets: workload.overdueTickets,
+              ticketsClosedToday: workload.ticketsClosedToday,
+              ticketsClosedThisWeek: workload.ticketsClosedThisWeek,
+            },
+          };
+        } catch (error) {
+          return formatError(error, 'getAgent');
+        }
       },
     }),
 
@@ -81,10 +122,16 @@ export function createAgentTools(ctx: HaloContext) {
         agentId: z.number().optional().describe('Agent ID (if not provided, returns all agents)'),
       }),
       execute: async ({ agentId }) => {
-        if (agentId) {
-          return ctx.agents.getAgentWorkload(agentId);
+        try {
+          if (agentId) {
+            const workload = await ctx.agents.getAgentWorkload(agentId);
+            return { success: true, ...workload };
+          }
+          const workloads = await ctx.agents.getWorkloadStats();
+          return { success: true, workloads };
+        } catch (error) {
+          return formatError(error, 'getAgentWorkload');
         }
-        return ctx.agents.getWorkloadStats();
       },
     }),
 
@@ -94,17 +141,24 @@ export function createAgentTools(ctx: HaloContext) {
         isActive: z.boolean().optional().default(true).describe('Filter by active status'),
       }),
       execute: async ({ isActive }) => {
-        const teams = isActive
-          ? await ctx.agents.teams.listActive()
-          : await ctx.agents.teams.list();
+        try {
+          const teams = isActive
+            ? await ctx.agents.teams.listActive()
+            : await ctx.agents.teams.list();
 
-        return teams.map((t: Team) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          memberCount: t.agentCount,
-          isActive: !t.inactive,
-        }));
+          return {
+            success: true,
+            teams: teams.map((t: Team) => ({
+              id: t.id,
+              name: t.name,
+              description: t.description,
+              memberCount: t.agentCount,
+              isActive: !t.inactive,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTeams');
+        }
       },
     }),
 
@@ -114,17 +168,22 @@ export function createAgentTools(ctx: HaloContext) {
         teamId: z.number().describe('The team ID to retrieve'),
       }),
       execute: async ({ teamId }) => {
-        const team = await ctx.agents.teams.get(teamId);
+        try {
+          const team = await ctx.agents.teams.get(teamId);
 
-        return {
-          id: team.id,
-          name: team.name,
-          description: team.description,
-          department: team.departmentName,
-          isActive: !team.inactive,
-          memberCount: team.agentCount,
-          openTickets: team.openTicketCount,
-        };
+          return {
+            success: true,
+            id: team.id,
+            name: team.name,
+            description: team.description,
+            department: team.departmentName,
+            isActive: !team.inactive,
+            memberCount: team.agentCount,
+            openTickets: team.openTicketCount,
+          };
+        } catch (error) {
+          return formatError(error, 'getTeam');
+        }
       },
     }),
 
@@ -137,23 +196,28 @@ export function createAgentTools(ctx: HaloContext) {
         endDate: z.string().optional().describe('End date (YYYY-MM-DD), defaults to 7 days from start'),
       }),
       execute: async ({ agentId, startDate, endDate }) => {
-        const start = startDate || new Date().toISOString().split('T')[0];
-        const end = endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
         try {
-          const availability = await ctx.agents.getAvailability(agentId, { startDate: start, endDate: end });
-          return availability;
-        } catch {
-          // Fallback if availability API not available
-          const agent = await ctx.agents.get(agentId);
-          return {
-            agentId: agent.id,
-            agentName: agent.name,
-            startDate: start,
-            endDate: end,
-            isAvailable: !agent.inactive,
-            message: 'Detailed availability data not available',
-          };
+          const start = startDate || new Date().toISOString().split('T')[0];
+          const end = endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+          try {
+            const availability = await ctx.agents.getAvailability(agentId, { startDate: start, endDate: end });
+            return { success: true, ...availability };
+          } catch {
+            // Fallback if availability API not available
+            const agent = await ctx.agents.get(agentId);
+            return {
+              success: true,
+              agentId: agent.id,
+              agentName: agent.name,
+              startDate: start,
+              endDate: end,
+              isAvailable: !agent.inactive,
+              message: 'Detailed availability data not available',
+            };
+          }
+        } catch (error) {
+          return formatError(error, 'getAgentAvailability');
         }
       },
     }),
@@ -173,13 +237,19 @@ export function createAgentTools(ctx: HaloContext) {
             endDate,
             count: count || 50,
           });
-          return events;
-        } catch {
-          return {
-            agentId,
-            events: [],
-            message: 'Calendar data not available',
-          };
+          return { success: true, events };
+        } catch (error) {
+          // Check if this is just a "not available" situation
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('404') || message.includes('not found')) {
+            return {
+              success: true,
+              agentId,
+              events: [],
+              message: 'Calendar data not available',
+            };
+          }
+          return formatError(error, 'listAgentCalendar');
         }
       },
     }),
@@ -191,21 +261,26 @@ export function createAgentTools(ctx: HaloContext) {
         date: z.string().optional().describe('Date to check (YYYY-MM-DD), defaults to today'),
       }),
       execute: async ({ teamId, date }) => {
-        const checkDate = date || new Date().toISOString().split('T')[0];
-
         try {
-          const availability = await ctx.agents.teams.getAvailability(teamId, { date: checkDate });
-          return availability;
-        } catch {
-          // Fallback
-          const team = await ctx.agents.teams.get(teamId);
-          return {
-            teamId: team.id,
-            teamName: team.name,
-            date: checkDate,
-            totalAgents: team.agentCount,
-            message: 'Detailed availability data not available',
-          };
+          const checkDate = date || new Date().toISOString().split('T')[0];
+
+          try {
+            const availability = await ctx.agents.teams.getAvailability(teamId, { date: checkDate });
+            return { success: true, ...availability };
+          } catch {
+            // Fallback
+            const team = await ctx.agents.teams.get(teamId);
+            return {
+              success: true,
+              teamId: team.id,
+              teamName: team.name,
+              date: checkDate,
+              totalAgents: team.agentCount,
+              message: 'Detailed availability data not available',
+            };
+          }
+        } catch (error) {
+          return formatError(error, 'getTeamAvailability');
         }
       },
     }),
@@ -238,10 +313,7 @@ export function createAgentTools(ctx: HaloContext) {
             message: `Calendar event '${title}' created for agent`,
           };
         } catch (error) {
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to create calendar event',
-          };
+          return formatError(error, 'createAgentCalendarEvent');
         }
       },
     }),
@@ -256,33 +328,39 @@ export function createAgentTools(ctx: HaloContext) {
       }),
       execute: async ({ startDateTime, endDateTime, teamId, skillRequired }) => {
         try {
-          const available = await ctx.agents.findAvailable({
-            startDateTime,
-            endDateTime,
-            teamId,
-            skillRequired,
-          });
-          return {
-            startDateTime,
-            endDateTime,
-            availableAgents: available,
-          };
-        } catch {
-          // Fallback: return active agents
-          const agents = teamId
-            ? await ctx.agents.listByTeam(teamId)
-            : await ctx.agents.listActive(100);
+          try {
+            const available = await ctx.agents.findAvailable({
+              startDateTime,
+              endDateTime,
+              teamId,
+              skillRequired,
+            });
+            return {
+              success: true,
+              startDateTime,
+              endDateTime,
+              availableAgents: available,
+            };
+          } catch {
+            // Fallback: return active agents
+            const agents = teamId
+              ? await ctx.agents.listByTeam(teamId)
+              : await ctx.agents.listActive(100);
 
-          return {
-            startDateTime,
-            endDateTime,
-            availableAgents: agents.map((a: Agent) => ({
-              id: a.id,
-              name: a.name,
-              email: a.email,
-            })),
-            message: 'Showing active agents (availability API not available)',
-          };
+            return {
+              success: true,
+              startDateTime,
+              endDateTime,
+              availableAgents: agents.map((a: Agent) => ({
+                id: a.id,
+                name: a.name,
+                email: a.email,
+              })),
+              message: 'Showing active agents (availability API not available)',
+            };
+          }
+        } catch (error) {
+          return formatError(error, 'findAvailableAgents');
         }
       },
     }),

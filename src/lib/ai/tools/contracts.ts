@@ -7,6 +7,29 @@ import { z } from 'zod';
 import type { HaloContext } from './context';
 import type { Contract, SLA, RecurringService } from '@/lib/halopsa/types';
 
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 const DEFAULT_COUNT = 20;
 const DEFAULT_EXPIRING_DAYS = 30;
 
@@ -22,30 +45,37 @@ export function createContractTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ clientId, status, expiringWithinDays, count }) => {
-        let contracts: Contract[];
-        if (status === 'active') {
-          contracts = await ctx.contracts.listActive({ clientId, count: count || DEFAULT_COUNT });
-        } else if (expiringWithinDays) {
-          contracts = await ctx.contracts.listExpiring({
-            days: expiringWithinDays,
-            count: count || DEFAULT_COUNT,
-          });
-        } else {
-          contracts = await ctx.contracts.listFiltered({
-            clientId,
-            status,
-            count: count || DEFAULT_COUNT,
-          });
-        }
+        try {
+          let contracts: Contract[];
+          if (status === 'active') {
+            contracts = await ctx.contracts.listActive({ clientId, count: count || DEFAULT_COUNT });
+          } else if (expiringWithinDays) {
+            contracts = await ctx.contracts.listExpiring({
+              days: expiringWithinDays,
+              count: count || DEFAULT_COUNT,
+            });
+          } else {
+            contracts = await ctx.contracts.listFiltered({
+              clientId,
+              status,
+              count: count || DEFAULT_COUNT,
+            });
+          }
 
-        return contracts.map((c: Contract) => ({
-          id: c.id,
-          name: c.name,
-          client: c.clientName,
-          status: c.status,
-          startDate: c.startDate,
-          endDate: c.endDate,
-        }));
+          return {
+            success: true,
+            contracts: contracts.map((c: Contract) => ({
+              id: c.id,
+              name: c.name,
+              client: c.clientName,
+              status: c.status,
+              startDate: c.startDate,
+              endDate: c.endDate,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listContracts');
+        }
       },
     }),
 
@@ -55,28 +85,33 @@ export function createContractTools(ctx: HaloContext) {
         contractId: z.number().describe('The contract ID'),
       }),
       execute: async ({ contractId }) => {
-        const contract = await ctx.contracts.get(contractId);
-        const prepaidRemaining = contract.prepaidHours && contract.prepaidHoursUsed
-          ? contract.prepaidHours - contract.prepaidHoursUsed
-          : undefined;
-        return {
-          id: contract.id,
-          name: contract.name,
-          client: contract.clientName,
-          status: contract.status,
-          type: contract.contractType,
-          startDate: contract.startDate,
-          endDate: contract.endDate,
-          recurringAmount: contract.recurringAmount,
-          billingCycle: contract.billingCycle,
-          prepaidHours: contract.prepaidHours,
-          prepaidHoursUsed: contract.prepaidHoursUsed,
-          prepaidHoursRemaining: prepaidRemaining,
-          slaId: contract.slaId,
-          slaName: contract.slaName,
-          autoRenew: contract.autoRenew,
-          notes: contract.notes,
-        };
+        try {
+          const contract = await ctx.contracts.get(contractId);
+          const prepaidRemaining = contract.prepaidHours && contract.prepaidHoursUsed
+            ? contract.prepaidHours - contract.prepaidHoursUsed
+            : undefined;
+          return {
+            success: true,
+            id: contract.id,
+            name: contract.name,
+            client: contract.clientName,
+            status: contract.status,
+            type: contract.contractType,
+            startDate: contract.startDate,
+            endDate: contract.endDate,
+            recurringAmount: contract.recurringAmount,
+            billingCycle: contract.billingCycle,
+            prepaidHours: contract.prepaidHours,
+            prepaidHoursUsed: contract.prepaidHoursUsed,
+            prepaidHoursRemaining: prepaidRemaining,
+            slaId: contract.slaId,
+            slaName: contract.slaName,
+            autoRenew: contract.autoRenew,
+            notes: contract.notes,
+          };
+        } catch (error) {
+          return formatError(error, 'getContract');
+        }
       },
     }),
 
@@ -96,30 +131,34 @@ export function createContractTools(ctx: HaloContext) {
         notes: z.string().optional().describe('Contract notes'),
       }),
       execute: async ({ name, clientId, startDate, contractType, endDate, recurringAmount, billingCycle, prepaidHours, slaId, autoRenew, notes }) => {
-        const contractData: Record<string, unknown> = {
-          name,
-          clientId,
-          startDate,
-          autoRenew: autoRenew || false,
-        };
-
-        if (contractType) contractData.type = contractType;
-        if (endDate) contractData.endDate = endDate;
-        if (recurringAmount) contractData.recurringAmount = recurringAmount;
-        if (billingCycle) contractData.billingCycle = billingCycle;
-        if (prepaidHours) contractData.prepaidHours = prepaidHours;
-        if (slaId) contractData.slaId = slaId;
-        if (notes) contractData.notes = notes;
-
-        const contracts = await ctx.contracts.create([contractData]);
-        if (contracts && contracts.length > 0) {
-          return {
-            success: true,
-            contractId: contracts[0].id,
-            name: contracts[0].name,
+        try {
+          const contractData: Record<string, unknown> = {
+            name,
+            clientId,
+            startDate,
+            autoRenew: autoRenew || false,
           };
+
+          if (contractType) contractData.type = contractType;
+          if (endDate) contractData.endDate = endDate;
+          if (recurringAmount) contractData.recurringAmount = recurringAmount;
+          if (billingCycle) contractData.billingCycle = billingCycle;
+          if (prepaidHours) contractData.prepaidHours = prepaidHours;
+          if (slaId) contractData.slaId = slaId;
+          if (notes) contractData.notes = notes;
+
+          const contracts = await ctx.contracts.create([contractData]);
+          if (contracts && contracts.length > 0) {
+            return {
+              success: true,
+              contractId: contracts[0].id,
+              name: contracts[0].name,
+            };
+          }
+          return { success: false, error: 'Failed to create contract' };
+        } catch (error) {
+          return formatError(error, 'createContract');
         }
-        return { success: false, error: 'Failed to create contract' };
       },
     }),
 
@@ -134,23 +173,27 @@ export function createContractTools(ctx: HaloContext) {
         autoRenew: z.boolean().optional().describe('New auto-renew setting'),
       }),
       execute: async ({ contractId, name, status, endDate, recurringAmount, autoRenew }) => {
-        const updateData: Record<string, unknown> = { id: contractId };
+        try {
+          const updateData: Record<string, unknown> = { id: contractId };
 
-        if (name !== undefined) updateData.name = name;
-        if (status !== undefined) updateData.status = status;
-        if (endDate !== undefined) updateData.endDate = endDate;
-        if (recurringAmount !== undefined) updateData.recurringAmount = recurringAmount;
-        if (autoRenew !== undefined) updateData.autoRenew = autoRenew;
+          if (name !== undefined) updateData.name = name;
+          if (status !== undefined) updateData.status = status;
+          if (endDate !== undefined) updateData.endDate = endDate;
+          if (recurringAmount !== undefined) updateData.recurringAmount = recurringAmount;
+          if (autoRenew !== undefined) updateData.autoRenew = autoRenew;
 
-        const contracts = await ctx.contracts.update([updateData]);
-        if (contracts && contracts.length > 0) {
-          return {
-            success: true,
-            contractId: contracts[0].id,
-            name: contracts[0].name,
-          };
+          const contracts = await ctx.contracts.update([updateData]);
+          if (contracts && contracts.length > 0) {
+            return {
+              success: true,
+              contractId: contracts[0].id,
+              name: contracts[0].name,
+            };
+          }
+          return { success: false, error: 'Failed to update contract' };
+        } catch (error) {
+          return formatError(error, 'updateContract');
         }
-        return { success: false, error: 'Failed to update contract' };
       },
     }),
 
@@ -162,16 +205,20 @@ export function createContractTools(ctx: HaloContext) {
         resetPrepaidHours: z.boolean().optional().default(true).describe('Reset prepaid hours counter'),
       }),
       execute: async ({ contractId, newEndDate, resetPrepaidHours }) => {
-        const contract = await ctx.contracts.renew(contractId, {
-          newEndDate,
-          resetPrepaidHours: resetPrepaidHours !== false,
-        });
+        try {
+          const contract = await ctx.contracts.renew(contractId, {
+            newEndDate,
+            resetPrepaidHours: resetPrepaidHours !== false,
+          });
 
-        return {
-          success: true,
-          contractId: contract.id,
-          newEndDate: contract.endDate,
-        };
+          return {
+            success: true,
+            contractId: contract.id,
+            newEndDate: contract.endDate,
+          };
+        } catch (error) {
+          return formatError(error, 'renewContract');
+        }
       },
     }),
 
@@ -181,22 +228,29 @@ export function createContractTools(ctx: HaloContext) {
         days: z.number().optional().default(DEFAULT_EXPIRING_DAYS).describe('Days to look ahead'),
       }),
       execute: async ({ days }) => {
-        const contracts = await ctx.contracts.listExpiring({
-          days: days || DEFAULT_EXPIRING_DAYS,
-        });
+        try {
+          const contracts = await ctx.contracts.listExpiring({
+            days: days || DEFAULT_EXPIRING_DAYS,
+          });
 
-        return contracts.map((c: Contract) => {
-          const daysUntil = c.endDate
-            ? Math.ceil((new Date(c.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-            : undefined;
           return {
-            id: c.id,
-            name: c.name,
-            client: c.clientName,
-            endDate: c.endDate,
-            daysUntilExpiry: daysUntil,
+            success: true,
+            contracts: contracts.map((c: Contract) => {
+              const daysUntil = c.endDate
+                ? Math.ceil((new Date(c.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                : undefined;
+              return {
+                id: c.id,
+                name: c.name,
+                client: c.clientName,
+                endDate: c.endDate,
+                daysUntilExpiry: daysUntil,
+              };
+            }),
           };
-        });
+        } catch (error) {
+          return formatError(error, 'getExpiringContracts');
+        }
       },
     }),
 
@@ -204,7 +258,15 @@ export function createContractTools(ctx: HaloContext) {
       description: 'Get contract statistics and summary.',
       parameters: z.object({}),
       execute: async () => {
-        return ctx.contracts.getSummary();
+        try {
+          const summary = await ctx.contracts.getSummary();
+          return {
+            success: true,
+            ...summary,
+          };
+        } catch (error) {
+          return formatError(error, 'getContractSummary');
+        }
       },
     }),
 
@@ -215,16 +277,23 @@ export function createContractTools(ctx: HaloContext) {
         isActive: z.boolean().optional().describe('Filter by active status'),
       }),
       execute: async ({ isActive }) => {
-        const slas = isActive !== false
-          ? await ctx.contracts.slas.listActive()
-          : await ctx.contracts.slas.list();
+        try {
+          const slas = isActive !== false
+            ? await ctx.contracts.slas.listActive()
+            : await ctx.contracts.slas.list();
 
-        return slas.map((s: SLA) => ({
-          id: s.id,
-          name: s.name,
-          isDefault: s.isDefault,
-          isActive: s.isActive,
-        }));
+          return {
+            success: true,
+            slas: slas.map((s: SLA) => ({
+              id: s.id,
+              name: s.name,
+              isDefault: s.isDefault,
+              isActive: s.isActive,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listSlas');
+        }
       },
     }),
 
@@ -234,15 +303,20 @@ export function createContractTools(ctx: HaloContext) {
         slaId: z.number().describe('The SLA ID'),
       }),
       execute: async ({ slaId }) => {
-        const sla = await ctx.contracts.slas.get(slaId);
-        return {
-          id: sla.id,
-          name: sla.name,
-          description: sla.description,
-          isDefault: sla.isDefault,
-          isActive: sla.isActive,
-          targets: sla.targets,
-        };
+        try {
+          const sla = await ctx.contracts.slas.get(slaId);
+          return {
+            success: true,
+            id: sla.id,
+            name: sla.name,
+            description: sla.description,
+            isDefault: sla.isDefault,
+            isActive: sla.isActive,
+            targets: sla.targets,
+          };
+        } catch (error) {
+          return formatError(error, 'getSla');
+        }
       },
     }),
 
@@ -255,23 +329,27 @@ export function createContractTools(ctx: HaloContext) {
         isActive: z.boolean().optional().default(true).describe('Whether SLA is active'),
       }),
       execute: async ({ name, description, isDefault, isActive }) => {
-        const slaData: Record<string, unknown> = {
-          name,
-          isDefault: isDefault || false,
-          isActive: isActive !== false,
-        };
-        if (description) slaData.description = description;
-
-        const slas = await ctx.contracts.slas.create([slaData]);
-        if (slas && slas.length > 0) {
-          return {
-            success: true,
-            slaId: slas[0].id,
-            name: slas[0].name,
-            message: `SLA '${name}' created successfully`,
+        try {
+          const slaData: Record<string, unknown> = {
+            name,
+            isDefault: isDefault || false,
+            isActive: isActive !== false,
           };
+          if (description) slaData.description = description;
+
+          const slas = await ctx.contracts.slas.create([slaData]);
+          if (slas && slas.length > 0) {
+            return {
+              success: true,
+              slaId: slas[0].id,
+              name: slas[0].name,
+              message: `SLA '${name}' created successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to create SLA' };
+        } catch (error) {
+          return formatError(error, 'createSla');
         }
-        return { success: false, error: 'Failed to create SLA' };
       },
     }),
 
@@ -285,17 +363,21 @@ export function createContractTools(ctx: HaloContext) {
         escalationTimeMinutes: z.number().optional().describe('Escalation time in minutes'),
       }),
       execute: async ({ slaId, priorityId, responseTimeMinutes, resolutionTimeMinutes, escalationTimeMinutes }) => {
-        const target = await ctx.contracts.slas.createTarget(slaId, {
-          priorityId,
-          responseTimeMinutes,
-          resolutionTimeMinutes,
-          escalationTimeMinutes,
-        });
+        try {
+          const target = await ctx.contracts.slas.createTarget(slaId, {
+            priorityId,
+            responseTimeMinutes,
+            resolutionTimeMinutes,
+            escalationTimeMinutes,
+          });
 
-        return {
-          success: true,
-          targetId: target.id,
-        };
+          return {
+            success: true,
+            targetId: target.id,
+          };
+        } catch (error) {
+          return formatError(error, 'createSlaTarget');
+        }
       },
     }),
 
@@ -309,24 +391,31 @@ export function createContractTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ clientId, contractId, isActive, count }) => {
-        let services;
-        if (clientId) {
-          services = await ctx.contracts.recurringServices.listByClient(clientId, { count: count || DEFAULT_COUNT });
-        } else if (contractId) {
-          services = await ctx.contracts.recurringServices.listByContract(contractId, { count: count || DEFAULT_COUNT });
-        } else if (isActive !== false) {
-          services = await ctx.contracts.recurringServices.listActive({ count: count || DEFAULT_COUNT });
-        } else {
-          services = await ctx.contracts.recurringServices.list({ count: count || DEFAULT_COUNT });
-        }
+        try {
+          let services;
+          if (clientId) {
+            services = await ctx.contracts.recurringServices.listByClient(clientId, { count: count || DEFAULT_COUNT });
+          } else if (contractId) {
+            services = await ctx.contracts.recurringServices.listByContract(contractId, { count: count || DEFAULT_COUNT });
+          } else if (isActive !== false) {
+            services = await ctx.contracts.recurringServices.listActive({ count: count || DEFAULT_COUNT });
+          } else {
+            services = await ctx.contracts.recurringServices.list({ count: count || DEFAULT_COUNT });
+          }
 
-        return services.map((s: RecurringService) => ({
-          id: s.id,
-          name: s.name,
-          client: s.clientName,
-          totalPrice: s.unitPrice * s.quantity,
-          billingFrequency: s.billingFrequency,
-        }));
+          return {
+            success: true,
+            services: services.map((s: RecurringService) => ({
+              id: s.id,
+              name: s.name,
+              client: s.clientName,
+              totalPrice: s.unitPrice * s.quantity,
+              billingFrequency: s.billingFrequency,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listRecurringServices');
+        }
       },
     }),
 
@@ -343,27 +432,31 @@ export function createContractTools(ctx: HaloContext) {
         description: z.string().optional().describe('Service description'),
       }),
       execute: async ({ name, clientId, unitPrice, quantity, billingFrequency, contractId, startDate, description }) => {
-        const serviceData: Record<string, unknown> = {
-          name,
-          clientId,
-          unitPrice,
-          quantity: quantity || 1,
-          billingFrequency: billingFrequency || 'monthly',
-        };
-
-        if (contractId) serviceData.contractId = contractId;
-        if (startDate) serviceData.startDate = startDate;
-        if (description) serviceData.description = description;
-
-        const services = await ctx.contracts.recurringServices.create([serviceData]);
-        if (services && services.length > 0) {
-          return {
-            success: true,
-            serviceId: services[0].id,
-            name: services[0].name,
+        try {
+          const serviceData: Record<string, unknown> = {
+            name,
+            clientId,
+            unitPrice,
+            quantity: quantity || 1,
+            billingFrequency: billingFrequency || 'monthly',
           };
+
+          if (contractId) serviceData.contractId = contractId;
+          if (startDate) serviceData.startDate = startDate;
+          if (description) serviceData.description = description;
+
+          const services = await ctx.contracts.recurringServices.create([serviceData]);
+          if (services && services.length > 0) {
+            return {
+              success: true,
+              serviceId: services[0].id,
+              name: services[0].name,
+            };
+          }
+          return { success: false, error: 'Failed to create recurring service' };
+        } catch (error) {
+          return formatError(error, 'createRecurringService');
         }
-        return { success: false, error: 'Failed to create recurring service' };
       },
     }),
   };

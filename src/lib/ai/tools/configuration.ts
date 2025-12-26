@@ -8,6 +8,29 @@ import type { HaloContext } from './context';
 import type { CustomField, TicketStatus, TicketType, Priority, Category } from '@/lib/halopsa/types';
 import type { Workflow, EmailTemplate, TicketTemplate } from '@/lib/halopsa/services/configuration';
 
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 const DEFAULT_COUNT = 50;
 
 export function createConfigurationTools(ctx: HaloContext) {
@@ -19,15 +42,22 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const fields = await ctx.configuration.listCustomFields({ count: count || DEFAULT_COUNT });
-        return fields.map((f: CustomField) => ({
-          id: f.id,
-          name: f.name,
-          label: f.label,
-          type: f.type,
-          table: f.table,
-          isRequired: f.isRequired,
-        }));
+        try {
+          const fields = await ctx.configuration.listCustomFields({ count: count || DEFAULT_COUNT });
+          return {
+            success: true,
+            data: fields.map((f: CustomField) => ({
+              id: f.id,
+              name: f.name,
+              label: f.label,
+              type: f.type,
+              table: f.table,
+              isRequired: f.isRequired,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listCustomFields');
+        }
       },
     }),
 
@@ -37,7 +67,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         fieldId: z.number().describe('The custom field ID'),
       }),
       execute: async ({ fieldId }) => {
-        return ctx.configuration.getCustomField(fieldId);
+        try {
+          const field = await ctx.configuration.getCustomField(fieldId);
+          return { success: true, data: field };
+        } catch (error) {
+          return formatError(error, 'getCustomField');
+        }
       },
     }),
 
@@ -46,14 +81,21 @@ export function createConfigurationTools(ctx: HaloContext) {
       description: 'List all ticket statuses available in HaloPSA.',
       parameters: z.object({}),
       execute: async () => {
-        const statuses = await ctx.configuration.listTicketStatuses();
-        return statuses.map((s: TicketStatus) => ({
-          id: s.id,
-          name: s.name,
-          isOpen: s.isOpen,
-          isClosed: s.isClosed,
-          isDefault: s.isDefault,
-        }));
+        try {
+          const statuses = await ctx.configuration.listTicketStatuses();
+          return {
+            success: true,
+            data: statuses.map((s: TicketStatus) => ({
+              id: s.id,
+              name: s.name,
+              isOpen: s.isOpen,
+              isClosed: s.isClosed,
+              isDefault: s.isDefault,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTicketStatuses');
+        }
       },
     }),
 
@@ -62,13 +104,20 @@ export function createConfigurationTools(ctx: HaloContext) {
       description: 'List all ticket types (e.g., Incident, Service Request).',
       parameters: z.object({}),
       execute: async () => {
-        const types = await ctx.configuration.listTicketTypes();
-        return types.map((t: TicketType) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          isDefault: t.isDefault,
-        }));
+        try {
+          const types = await ctx.configuration.listTicketTypes();
+          return {
+            success: true,
+            data: types.map((t: TicketType) => ({
+              id: t.id,
+              name: t.name,
+              description: t.description,
+              isDefault: t.isDefault,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTicketTypes');
+        }
       },
     }),
 
@@ -77,12 +126,19 @@ export function createConfigurationTools(ctx: HaloContext) {
       description: 'List all priority levels.',
       parameters: z.object({}),
       execute: async () => {
-        const priorities = await ctx.configuration.listPriorities();
-        return priorities.map((p: Priority) => ({
-          id: p.id,
-          name: p.name,
-          isDefault: p.isDefault,
-        }));
+        try {
+          const priorities = await ctx.configuration.listPriorities();
+          return {
+            success: true,
+            data: priorities.map((p: Priority) => ({
+              id: p.id,
+              name: p.name,
+              isDefault: p.isDefault,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listPriorities');
+        }
       },
     }),
 
@@ -93,13 +149,20 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const categories = await ctx.configuration.listCategories({ count: count || DEFAULT_COUNT });
-        return categories.map((c: Category) => ({
-          id: c.id,
-          name: c.name,
-          level: c.level,
-          parentId: c.parentId,
-        }));
+        try {
+          const categories = await ctx.configuration.listCategories({ count: count || DEFAULT_COUNT });
+          return {
+            success: true,
+            data: categories.map((c: Category) => ({
+              id: c.id,
+              name: c.name,
+              level: c.level,
+              parentId: c.parentId,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listCategories');
+        }
       },
     }),
 
@@ -110,14 +173,21 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const workflows = await ctx.configuration.listWorkflows({ count: count || DEFAULT_COUNT });
-        return workflows.map((w: Workflow) => ({
-          id: w.id,
-          name: w.name,
-          description: w.description,
-          isActive: w.isActive,
-          triggerType: w.triggerType,
-        }));
+        try {
+          const workflows = await ctx.configuration.listWorkflows({ count: count || DEFAULT_COUNT });
+          return {
+            success: true,
+            data: workflows.map((w: Workflow) => ({
+              id: w.id,
+              name: w.name,
+              description: w.description,
+              isActive: w.isActive,
+              triggerType: w.triggerType,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listWorkflows');
+        }
       },
     }),
 
@@ -127,7 +197,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         workflowId: z.number().describe('The workflow ID'),
       }),
       execute: async ({ workflowId }) => {
-        return ctx.configuration.getWorkflow(workflowId);
+        try {
+          const workflow = await ctx.configuration.getWorkflow(workflowId);
+          return { success: true, data: workflow };
+        } catch (error) {
+          return formatError(error, 'getWorkflow');
+        }
       },
     }),
 
@@ -138,13 +213,17 @@ export function createConfigurationTools(ctx: HaloContext) {
         isActive: z.boolean().describe('Whether the workflow should be active'),
       }),
       execute: async ({ workflowId, isActive }) => {
-        const result = await ctx.configuration.toggleWorkflow(workflowId, isActive);
-        return {
-          success: true,
-          workflowId,
-          isActive,
-          message: `Workflow ${isActive ? 'enabled' : 'disabled'} successfully`,
-        };
+        try {
+          const result = await ctx.configuration.toggleWorkflow(workflowId, isActive);
+          return {
+            success: true,
+            workflowId,
+            isActive,
+            message: `Workflow ${isActive ? 'enabled' : 'disabled'} successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'toggleWorkflow');
+        }
       },
     }),
 
@@ -155,13 +234,20 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const templates = await ctx.configuration.listEmailTemplates({ count: count || DEFAULT_COUNT });
-        return templates.map((t: EmailTemplate) => ({
-          id: t.id,
-          name: t.name,
-          subject: t.subject,
-          isActive: t.isActive,
-        }));
+        try {
+          const templates = await ctx.configuration.listEmailTemplates({ count: count || DEFAULT_COUNT });
+          return {
+            success: true,
+            data: templates.map((t: EmailTemplate) => ({
+              id: t.id,
+              name: t.name,
+              subject: t.subject,
+              isActive: t.isActive,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listEmailTemplates');
+        }
       },
     }),
 
@@ -171,7 +257,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         templateId: z.number().describe('The email template ID'),
       }),
       execute: async ({ templateId }) => {
-        return ctx.configuration.getEmailTemplate(templateId);
+        try {
+          const template = await ctx.configuration.getEmailTemplate(templateId);
+          return { success: true, data: template };
+        } catch (error) {
+          return formatError(error, 'getEmailTemplate');
+        }
       },
     }),
 
@@ -184,18 +275,22 @@ export function createConfigurationTools(ctx: HaloContext) {
         isActive: z.boolean().optional().default(true).describe('Whether template is active'),
       }),
       execute: async ({ name, subject, body, isActive }) => {
-        const result = await ctx.configuration.createEmailTemplate({
-          name,
-          subject,
-          body,
-          isActive: isActive !== false,
-        });
-        return {
-          success: true,
-          templateId: result[0]?.id,
-          name,
-          message: `Email template '${name}' created successfully`,
-        };
+        try {
+          const result = await ctx.configuration.createEmailTemplate({
+            name,
+            subject,
+            body,
+            isActive: isActive !== false,
+          });
+          return {
+            success: true,
+            templateId: result[0]?.id,
+            name,
+            message: `Email template '${name}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createEmailTemplate');
+        }
       },
     }),
 
@@ -206,14 +301,21 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const templates = await ctx.configuration.listTicketTemplates({ count: count || DEFAULT_COUNT });
-        return templates.map((t: TicketTemplate) => ({
-          id: t.id,
-          name: t.name,
-          summary: t.summary,
-          ticketTypeId: t.ticketTypeId,
-          priorityId: t.priorityId,
-        }));
+        try {
+          const templates = await ctx.configuration.listTicketTemplates({ count: count || DEFAULT_COUNT });
+          return {
+            success: true,
+            data: templates.map((t: TicketTemplate) => ({
+              id: t.id,
+              name: t.name,
+              summary: t.summary,
+              ticketTypeId: t.ticketTypeId,
+              priorityId: t.priorityId,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTicketTemplates');
+        }
       },
     }),
 
@@ -223,7 +325,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         templateId: z.number().describe('The ticket template ID'),
       }),
       execute: async ({ templateId }) => {
-        return ctx.configuration.getTicketTemplate(templateId);
+        try {
+          const template = await ctx.configuration.getTicketTemplate(templateId);
+          return { success: true, data: template };
+        } catch (error) {
+          return formatError(error, 'getTicketTemplate');
+        }
       },
     }),
 
@@ -237,31 +344,35 @@ export function createConfigurationTools(ctx: HaloContext) {
         details: z.string().optional().describe('Override or append to template details'),
       }),
       execute: async ({ templateId, clientId, userId, summary, details }) => {
-        // Get template
-        const template = await ctx.configuration.getTicketTemplate(templateId);
+        try {
+          // Get template
+          const template = await ctx.configuration.getTicketTemplate(templateId);
 
-        // Create ticket using template values
-        const ticketData: Record<string, unknown> = {
-          summary: summary || template.summary,
-          details: details || template.details,
-          clientId,
-          tickettypeId: template.ticketTypeId,
-          priorityId: template.priorityId,
-          categoryId: template.categoryId,
-        };
-
-        if (userId) ticketData.userId = userId;
-
-        const tickets = await ctx.tickets.create([ticketData]);
-        if (tickets && tickets.length > 0) {
-          return {
-            success: true,
-            ticketId: tickets[0].id,
-            summary: tickets[0].summary,
-            message: `Ticket created from template '${template.name}'`,
+          // Create ticket using template values
+          const ticketData: Record<string, unknown> = {
+            summary: summary || template.summary,
+            details: details || template.details,
+            clientId,
+            tickettypeId: template.ticketTypeId,
+            priorityId: template.priorityId,
+            categoryId: template.categoryId,
           };
+
+          if (userId) ticketData.userId = userId;
+
+          const tickets = await ctx.tickets.create([ticketData]);
+          if (tickets && tickets.length > 0) {
+            return {
+              success: true,
+              ticketId: tickets[0].id,
+              summary: tickets[0].summary,
+              message: `Ticket created from template '${template.name}'`,
+            };
+          }
+          return { success: false, error: 'Failed to create ticket from template' };
+        } catch (error) {
+          return formatError(error, 'createTicketFromTemplate');
         }
-        return { success: false, error: 'Failed to create ticket from template' };
       },
     }),
 
@@ -276,19 +387,23 @@ export function createConfigurationTools(ctx: HaloContext) {
         categoryId: z.number().optional().describe('Default category ID'),
       }),
       execute: async ({ name, summary, details, ticketTypeId, priorityId, categoryId }) => {
-        const templateData: Record<string, unknown> = { name, summary };
-        if (details) templateData.details = details;
-        if (ticketTypeId) templateData.ticketTypeId = ticketTypeId;
-        if (priorityId) templateData.priorityId = priorityId;
-        if (categoryId) templateData.categoryId = categoryId;
+        try {
+          const templateData: Record<string, unknown> = { name, summary };
+          if (details) templateData.details = details;
+          if (ticketTypeId) templateData.ticketTypeId = ticketTypeId;
+          if (priorityId) templateData.priorityId = priorityId;
+          if (categoryId) templateData.categoryId = categoryId;
 
-        const result = await ctx.configuration.createTicketTemplate(templateData);
-        return {
-          success: true,
-          templateId: result[0]?.id,
-          name,
-          message: `Ticket template '${name}' created successfully`,
-        };
+          const result = await ctx.configuration.createTicketTemplate(templateData);
+          return {
+            success: true,
+            templateId: result[0]?.id,
+            name,
+            message: `Ticket template '${name}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createTicketTemplate');
+        }
       },
     }),
 
@@ -304,22 +419,26 @@ export function createConfigurationTools(ctx: HaloContext) {
         options: z.array(z.string()).optional().describe('Options for dropdown fields'),
       }),
       execute: async ({ name, label, type, table, isRequired, options }) => {
-        const fieldData: Record<string, unknown> = {
-          name,
-          label,
-          type,
-          table,
-          isRequired,
-        };
-        if (options) fieldData.options = options;
+        try {
+          const fieldData: Record<string, unknown> = {
+            name,
+            label,
+            type,
+            table,
+            isRequired,
+          };
+          if (options) fieldData.options = options;
 
-        const result = await ctx.configuration.createCustomField(fieldData);
-        return {
-          success: true,
-          fieldId: result[0]?.id,
-          name,
-          message: `Custom field '${label}' created successfully`,
-        };
+          const result = await ctx.configuration.createCustomField(fieldData);
+          return {
+            success: true,
+            fieldId: result[0]?.id,
+            name,
+            message: `Custom field '${label}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createCustomField');
+        }
       },
     }),
 
@@ -335,22 +454,26 @@ export function createConfigurationTools(ctx: HaloContext) {
         actions: z.string().optional().describe('Workflow actions (JSON)'),
       }),
       execute: async ({ name, description, triggerType, isActive, conditions, actions }) => {
-        const workflowData: Record<string, unknown> = {
-          name,
-          triggerType,
-          isActive,
-        };
-        if (description) workflowData.description = description;
-        if (conditions) workflowData.conditions = JSON.parse(conditions);
-        if (actions) workflowData.actions = JSON.parse(actions);
+        try {
+          const workflowData: Record<string, unknown> = {
+            name,
+            triggerType,
+            isActive,
+          };
+          if (description) workflowData.description = description;
+          if (conditions) workflowData.conditions = JSON.parse(conditions);
+          if (actions) workflowData.actions = JSON.parse(actions);
 
-        const result = await ctx.configuration.createWorkflow(workflowData);
-        return {
-          success: true,
-          workflowId: result[0]?.id,
-          name,
-          message: `Workflow '${name}' created successfully`,
-        };
+          const result = await ctx.configuration.createWorkflow(workflowData);
+          return {
+            success: true,
+            workflowId: result[0]?.id,
+            name,
+            message: `Workflow '${name}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createWorkflow');
+        }
       },
     }),
 
@@ -365,18 +488,22 @@ export function createConfigurationTools(ctx: HaloContext) {
         isActive: z.boolean().optional().describe('Whether template is active'),
       }),
       execute: async ({ templateId, name, subject, body, isActive }) => {
-        const updateData: Record<string, unknown> = { id: templateId };
-        if (name !== undefined) updateData.name = name;
-        if (subject !== undefined) updateData.subject = subject;
-        if (body !== undefined) updateData.body = body;
-        if (isActive !== undefined) updateData.isActive = isActive;
+        try {
+          const updateData: Record<string, unknown> = { id: templateId };
+          if (name !== undefined) updateData.name = name;
+          if (subject !== undefined) updateData.subject = subject;
+          if (body !== undefined) updateData.body = body;
+          if (isActive !== undefined) updateData.isActive = isActive;
 
-        const result = await ctx.configuration.updateEmailTemplate(updateData);
-        return {
-          success: true,
-          templateId,
-          message: `Email template updated successfully`,
-        };
+          const result = await ctx.configuration.updateEmailTemplate(updateData);
+          return {
+            success: true,
+            templateId,
+            message: `Email template updated successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'updateEmailTemplate');
+        }
       },
     }),
 
@@ -387,8 +514,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const rules = await ctx.configuration.listEscalationRules({ count: count || DEFAULT_COUNT });
-        return rules;
+        try {
+          const rules = await ctx.configuration.listEscalationRules({ count: count || DEFAULT_COUNT });
+          return { success: true, data: rules };
+        } catch (error) {
+          return formatError(error, 'listEscalationRules');
+        }
       },
     }),
 
@@ -403,22 +534,26 @@ export function createConfigurationTools(ctx: HaloContext) {
         isActive: z.boolean().optional().default(true).describe('Whether rule is active'),
       }),
       execute: async ({ name, description, triggerMinutes, escalateTo, escalateToType, isActive }) => {
-        const ruleData: Record<string, unknown> = {
-          name,
-          triggerMinutes,
-          escalateTo,
-          escalateToType,
-          isActive,
-        };
-        if (description) ruleData.description = description;
+        try {
+          const ruleData: Record<string, unknown> = {
+            name,
+            triggerMinutes,
+            escalateTo,
+            escalateToType,
+            isActive,
+          };
+          if (description) ruleData.description = description;
 
-        const result = await ctx.configuration.createEscalationRule(ruleData);
-        return {
-          success: true,
-          ruleId: result[0]?.id,
-          name,
-          message: `Escalation rule '${name}' created successfully`,
-        };
+          const result = await ctx.configuration.createEscalationRule(ruleData);
+          return {
+            success: true,
+            ruleId: result[0]?.id,
+            name,
+            message: `Escalation rule '${name}' created successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'createEscalationRule');
+        }
       },
     }),
 
@@ -429,8 +564,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         category: z.string().optional().describe('Filter by category'),
       }),
       execute: async ({ category }) => {
-        const settings = await ctx.configuration.listSystemSettings({ category });
-        return settings;
+        try {
+          const settings = await ctx.configuration.listSystemSettings({ category });
+          return { success: true, data: settings };
+        } catch (error) {
+          return formatError(error, 'listSystemSettings');
+        }
       },
     }),
 
@@ -440,7 +579,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         key: z.string().describe('Setting key'),
       }),
       execute: async ({ key }) => {
-        return ctx.configuration.getSystemSetting(key);
+        try {
+          const setting = await ctx.configuration.getSystemSetting(key);
+          return { success: true, data: setting };
+        } catch (error) {
+          return formatError(error, 'getSystemSetting');
+        }
       },
     }),
 
@@ -451,12 +595,16 @@ export function createConfigurationTools(ctx: HaloContext) {
         value: z.string().describe('New setting value'),
       }),
       execute: async ({ key, value }) => {
-        await ctx.configuration.updateSystemSetting(key, value);
-        return {
-          success: true,
-          key,
-          message: `System setting '${key}' updated successfully`,
-        };
+        try {
+          await ctx.configuration.updateSystemSetting(key, value);
+          return {
+            success: true,
+            key,
+            message: `System setting '${key}' updated successfully`,
+          };
+        } catch (error) {
+          return formatError(error, 'updateSystemSetting');
+        }
       },
     }),
 
@@ -465,7 +613,12 @@ export function createConfigurationTools(ctx: HaloContext) {
       description: 'Get HaloPSA API information and version.',
       parameters: z.object({}),
       execute: async () => {
-        return ctx.configuration.getApiInfo();
+        try {
+          const info = await ctx.configuration.getApiInfo();
+          return { success: true, data: info };
+        } catch (error) {
+          return formatError(error, 'getApiInfo');
+        }
       },
     }),
 
@@ -476,7 +629,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         parentId: z.number().optional().describe('Parent ID for hierarchical lookups'),
       }),
       execute: async ({ lookupType, parentId }) => {
-        return ctx.configuration.getLookupValues(lookupType, { parentId });
+        try {
+          const values = await ctx.configuration.getLookupValues(lookupType, { parentId });
+          return { success: true, data: values };
+        } catch (error) {
+          return formatError(error, 'getLookupValues');
+        }
       },
     }),
 
@@ -487,7 +645,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         fieldName: z.string().describe('Field name'),
       }),
       execute: async ({ tableName, fieldName }) => {
-        return ctx.configuration.getFieldInfo(tableName, fieldName);
+        try {
+          const fieldInfo = await ctx.configuration.getFieldInfo(tableName, fieldName);
+          return { success: true, data: fieldInfo };
+        } catch (error) {
+          return formatError(error, 'getFieldInfo');
+        }
       },
     }),
 
@@ -498,7 +661,12 @@ export function createConfigurationTools(ctx: HaloContext) {
         ticketTypeId: z.number().optional().describe('Filter by ticket type ID'),
       }),
       execute: async ({ clientId, ticketTypeId }) => {
-        return ctx.configuration.getSlaPolicies({ clientId, ticketTypeId });
+        try {
+          const policies = await ctx.configuration.getSlaPolicies({ clientId, ticketTypeId });
+          return { success: true, data: policies };
+        } catch (error) {
+          return formatError(error, 'getSlaPolicies');
+        }
       },
     }),
   };

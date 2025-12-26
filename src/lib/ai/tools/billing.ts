@@ -8,6 +8,29 @@ import { z } from 'zod';
 import type { HaloContext } from './context';
 import type { TimeEntry, Invoice, Project, Expense } from '@/lib/halopsa/types';
 
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 const DEFAULT_COUNT = 20;
 
 export function createBillingTools(ctx: HaloContext) {
@@ -26,27 +49,34 @@ export function createBillingTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ agentId, clientId, ticketId, startDate, endDate, billableOnly, unbilledOnly, count }) => {
-        const entries = await ctx.timeEntries.listFiltered({
-          agentId,
-          clientId,
-          ticketId,
-          startDate,
-          endDate,
-          billableOnly,
-          unbilledOnly,
-          count: count || DEFAULT_COUNT,
-        });
+        try {
+          const entries = await ctx.timeEntries.listFiltered({
+            agentId,
+            clientId,
+            ticketId,
+            startDate,
+            endDate,
+            billableOnly,
+            unbilledOnly,
+            count: count || DEFAULT_COUNT,
+          });
 
-        return entries.map((e: TimeEntry) => ({
-          id: e.id,
-          ticketId: e.ticketId,
-          durationMinutes: e.durationMinutes,
-          note: e.note,
-          billable: e.billable,
-          agentId: e.agentId,
-          agentName: e.agentName,
-          date: e.entryDate,
-        }));
+          return {
+            success: true,
+            data: entries.map((e: TimeEntry) => ({
+              id: e.id,
+              ticketId: e.ticketId,
+              durationMinutes: e.durationMinutes,
+              note: e.note,
+              billable: e.billable,
+              agentId: e.agentId,
+              agentName: e.agentName,
+              date: e.entryDate,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listTimeEntries');
+        }
       },
     }),
 
@@ -61,20 +91,24 @@ export function createBillingTools(ctx: HaloContext) {
         activityType: z.string().optional().describe('Type of activity'),
       }),
       execute: async ({ ticketId, durationMinutes, note, agentId, billable, activityType }) => {
-        const entry = await ctx.timeEntries.createForTicket(ticketId, {
-          durationMinutes,
-          note,
-          agentId,
-          billable,
-          activityType,
-        });
+        try {
+          const entry = await ctx.timeEntries.createForTicket(ticketId, {
+            durationMinutes,
+            note,
+            agentId,
+            billable,
+            activityType,
+          });
 
-        return {
-          success: true,
-          entryId: entry.id,
-          durationMinutes: entry.durationMinutes,
-          billable: entry.billable,
-        };
+          return {
+            success: true,
+            entryId: entry.id,
+            durationMinutes: entry.durationMinutes,
+            billable: entry.billable,
+          };
+        } catch (error) {
+          return formatError(error, 'createTimeEntry');
+        }
       },
     }),
 
@@ -87,7 +121,12 @@ export function createBillingTools(ctx: HaloContext) {
         endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
       }),
       execute: async ({ agentId, clientId, startDate, endDate }) => {
-        return ctx.timeEntries.getSummary({ agentId, clientId, startDate, endDate });
+        try {
+          const summary = await ctx.timeEntries.getSummary({ agentId, clientId, startDate, endDate });
+          return { success: true, ...summary };
+        } catch (error) {
+          return formatError(error, 'getTimeSummary');
+        }
       },
     }),
 
@@ -102,22 +141,29 @@ export function createBillingTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ clientId, status, startDate, endDate, count }) => {
-        const invoices = await ctx.invoices.listFiltered({
-          clientId,
-          status,
-          startDate,
-          endDate,
-          count: count || DEFAULT_COUNT,
-        });
+        try {
+          const invoices = await ctx.invoices.listFiltered({
+            clientId,
+            status,
+            startDate,
+            endDate,
+            count: count || DEFAULT_COUNT,
+          });
 
-        return invoices.map((i: Invoice) => ({
-          id: i.id,
-          invoiceNumber: i.invoiceNumber,
-          client: i.clientName,
-          total: i.totalAmount,
-          status: i.status,
-          dateDue: i.dateDue,
-        }));
+          return {
+            success: true,
+            data: invoices.map((i: Invoice) => ({
+              id: i.id,
+              invoiceNumber: i.invoiceNumber,
+              client: i.clientName,
+              total: i.totalAmount,
+              status: i.status,
+              dateDue: i.dateDue,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listInvoices');
+        }
       },
     }),
 
@@ -127,18 +173,23 @@ export function createBillingTools(ctx: HaloContext) {
         invoiceId: z.number().describe('The invoice ID'),
       }),
       execute: async ({ invoiceId }) => {
-        const invoice = await ctx.invoices.get(invoiceId);
-        return {
-          id: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          client: invoice.clientName,
-          total: invoice.totalAmount,
-          balanceDue: invoice.amountDue,
-          status: invoice.status,
-          dateDue: invoice.dateDue,
-          dateIssued: invoice.dateIssued,
-          lines: invoice.lines,
-        };
+        try {
+          const invoice = await ctx.invoices.get(invoiceId);
+          return {
+            success: true,
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            client: invoice.clientName,
+            total: invoice.totalAmount,
+            balanceDue: invoice.amountDue,
+            status: invoice.status,
+            dateDue: invoice.dateDue,
+            dateIssued: invoice.dateIssued,
+            lines: invoice.lines,
+          };
+        } catch (error) {
+          return formatError(error, 'getInvoice');
+        }
       },
     }),
 
@@ -156,31 +207,35 @@ export function createBillingTools(ctx: HaloContext) {
         })).optional().describe('Invoice line items'),
       }),
       execute: async ({ clientId, dateDue, description, lines }) => {
-        const invoiceData: Record<string, unknown> = {
-          client_id: clientId,
-        };
-        if (dateDue) invoiceData.datedue = dateDue;
-        if (description) invoiceData.description = description;
-        if (lines) {
-          invoiceData.lines = lines.map((line) => ({
-            description: line.description,
-            quantity: line.quantity,
-            unitprice: line.unitPrice,
-            taxable: line.taxable,
-          }));
-        }
-
-        const invoices = await ctx.invoices.create([invoiceData]);
-        if (invoices && invoices.length > 0) {
-          return {
-            success: true,
-            invoiceId: invoices[0].id,
-            invoiceNumber: invoices[0].invoiceNumber,
-            total: invoices[0].totalAmount,
-            message: `Invoice ${invoices[0].invoiceNumber} created successfully`,
+        try {
+          const invoiceData: Record<string, unknown> = {
+            client_id: clientId,
           };
+          if (dateDue) invoiceData.datedue = dateDue;
+          if (description) invoiceData.description = description;
+          if (lines) {
+            invoiceData.lines = lines.map((line) => ({
+              description: line.description,
+              quantity: line.quantity,
+              unitprice: line.unitPrice,
+              taxable: line.taxable,
+            }));
+          }
+
+          const invoices = await ctx.invoices.create([invoiceData]);
+          if (invoices && invoices.length > 0) {
+            return {
+              success: true,
+              invoiceId: invoices[0].id,
+              invoiceNumber: invoices[0].invoiceNumber,
+              total: invoices[0].totalAmount,
+              message: `Invoice ${invoices[0].invoiceNumber} created successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to create invoice' };
+        } catch (error) {
+          return formatError(error, 'createInvoice');
         }
-        return { success: false, error: 'Failed to create invoice' };
       },
     }),
 
@@ -194,40 +249,44 @@ export function createBillingTools(ctx: HaloContext) {
         includeExpenses: z.boolean().optional().default(false).describe('Include unbilled expenses'),
       }),
       execute: async ({ clientId, startDate, endDate, dateDue, includeExpenses }) => {
-        // Get unbilled time entries for the client
-        const timeEntries = await ctx.timeEntries.listFiltered({
-          clientId,
-          startDate,
-          endDate,
-          unbilledOnly: true,
-          billableOnly: true,
-          count: 1000,
-        });
+        try {
+          // Get unbilled time entries for the client
+          const timeEntries = await ctx.timeEntries.listFiltered({
+            clientId,
+            startDate,
+            endDate,
+            unbilledOnly: true,
+            billableOnly: true,
+            count: 1000,
+          });
 
-        if (timeEntries.length === 0) {
-          return {
-            success: false,
-            error: 'No unbilled time entries found for this client in the specified date range',
+          if (timeEntries.length === 0) {
+            return {
+              success: false,
+              error: 'No unbilled time entries found for this client in the specified date range',
+            };
+          }
+
+          // Create invoice data
+          const invoiceData: Record<string, unknown> = {
+            client_id: clientId,
           };
-        }
+          if (dateDue) invoiceData.datedue = dateDue;
 
-        // Create invoice data
-        const invoiceData: Record<string, unknown> = {
-          client_id: clientId,
-        };
-        if (dateDue) invoiceData.datedue = dateDue;
-
-        const invoices = await ctx.invoices.create([invoiceData]);
-        if (invoices && invoices.length > 0) {
-          return {
-            success: true,
-            invoiceId: invoices[0].id,
-            invoiceNumber: invoices[0].invoiceNumber,
-            timeEntriesIncluded: timeEntries.length,
-            message: `Invoice ${invoices[0].invoiceNumber} created from ${timeEntries.length} time entries`,
-          };
+          const invoices = await ctx.invoices.create([invoiceData]);
+          if (invoices && invoices.length > 0) {
+            return {
+              success: true,
+              invoiceId: invoices[0].id,
+              invoiceNumber: invoices[0].invoiceNumber,
+              timeEntriesIncluded: timeEntries.length,
+              message: `Invoice ${invoices[0].invoiceNumber} created from ${timeEntries.length} time entries`,
+            };
+          }
+          return { success: false, error: 'Failed to create invoice from time entries' };
+        } catch (error) {
+          return formatError(error, 'createInvoiceFromTime');
         }
-        return { success: false, error: 'Failed to create invoice from time entries' };
       },
     }),
 
@@ -238,11 +297,15 @@ export function createBillingTools(ctx: HaloContext) {
         emailAddresses: z.array(z.string()).optional().describe('Email addresses to send to'),
       }),
       execute: async ({ invoiceId, emailAddresses }) => {
-        const success = await ctx.invoices.send(invoiceId, emailAddresses);
-        return {
-          success,
-          message: success ? 'Invoice sent successfully' : 'Failed to send invoice',
-        };
+        try {
+          const success = await ctx.invoices.send(invoiceId, emailAddresses);
+          return {
+            success,
+            message: success ? 'Invoice sent successfully' : 'Failed to send invoice',
+          };
+        } catch (error) {
+          return formatError(error, 'sendInvoice');
+        }
       },
     }),
 
@@ -255,17 +318,21 @@ export function createBillingTools(ctx: HaloContext) {
         paymentMethod: z.string().optional().describe('Payment method'),
       }),
       execute: async ({ invoiceId, amount, paymentDate, paymentMethod }) => {
-        const invoice = await ctx.invoices.markPaid(invoiceId, {
-          amount,
-          paymentDate,
-          paymentMethod,
-        });
+        try {
+          const invoice = await ctx.invoices.markPaid(invoiceId, {
+            amount,
+            paymentDate,
+            paymentMethod,
+          });
 
-        return {
-          success: true,
-          invoiceId: invoice.id,
-          status: invoice.status,
-        };
+          return {
+            success: true,
+            invoiceId: invoice.id,
+            status: invoice.status,
+          };
+        } catch (error) {
+          return formatError(error, 'markInvoicePaid');
+        }
       },
     }),
 
@@ -277,7 +344,12 @@ export function createBillingTools(ctx: HaloContext) {
         endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
       }),
       execute: async ({ clientId, startDate, endDate }) => {
-        return ctx.invoices.getSummary({ clientId, startDate, endDate });
+        try {
+          const summary = await ctx.invoices.getSummary({ clientId, startDate, endDate });
+          return { success: true, ...summary };
+        } catch (error) {
+          return formatError(error, 'getInvoiceSummary');
+        }
       },
     }),
 
@@ -290,21 +362,28 @@ export function createBillingTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ clientId, status, count }) => {
-        let projects;
-        if (status === 'active') {
-          projects = await ctx.projects.listActive({ clientId, count: count || DEFAULT_COUNT });
-        } else {
-          projects = await ctx.projects.listFiltered({ clientId, status, count: count || DEFAULT_COUNT });
-        }
+        try {
+          let projects;
+          if (status === 'active') {
+            projects = await ctx.projects.listActive({ clientId, count: count || DEFAULT_COUNT });
+          } else {
+            projects = await ctx.projects.listFiltered({ clientId, status, count: count || DEFAULT_COUNT });
+          }
 
-        return projects.map((p: Project) => ({
-          id: p.id,
-          name: p.name,
-          client: p.clientName,
-          status: p.status,
-          budgetHours: p.budgetHours,
-          usedHours: p.hoursUsed,
-        }));
+          return {
+            success: true,
+            data: projects.map((p: Project) => ({
+              id: p.id,
+              name: p.name,
+              client: p.clientName,
+              status: p.status,
+              budgetHours: p.budgetHours,
+              usedHours: p.hoursUsed,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listProjects');
+        }
       },
     }),
 
@@ -314,19 +393,24 @@ export function createBillingTools(ctx: HaloContext) {
         projectId: z.number().describe('The project ID'),
       }),
       execute: async ({ projectId }) => {
-        const budget = await ctx.projects.getBudgetStatus(projectId);
-        return {
-          id: budget.projectId,
-          name: budget.projectName,
-          client: budget.clientName,
-          status: budget.status,
-          budgetHours: budget.budgetHours,
-          usedHours: budget.usedHours,
-          remainingHours: budget.remainingHours,
-          budgetAmount: budget.budgetAmount,
-          usedAmount: budget.usedAmount,
-          percentComplete: budget.percentComplete,
-        };
+        try {
+          const budget = await ctx.projects.getBudgetStatus(projectId);
+          return {
+            success: true,
+            id: budget.projectId,
+            name: budget.projectName,
+            client: budget.clientName,
+            status: budget.status,
+            budgetHours: budget.budgetHours,
+            usedHours: budget.usedHours,
+            remainingHours: budget.remainingHours,
+            budgetAmount: budget.budgetAmount,
+            usedAmount: budget.usedAmount,
+            percentComplete: budget.percentComplete,
+          };
+        } catch (error) {
+          return formatError(error, 'getProject');
+        }
       },
     }),
 
@@ -344,28 +428,32 @@ export function createBillingTools(ctx: HaloContext) {
         isBillable: z.boolean().optional().default(true).describe('Whether the project is billable'),
       }),
       execute: async ({ name, clientId, description, startDate, endDate, budgetHours, budgetAmount, projectManagerId, isBillable }) => {
-        const projectData: Record<string, unknown> = {
-          name,
-          clientId,
-          isBillable,
-        };
-
-        if (description) projectData.description = description;
-        if (startDate) projectData.startDate = startDate;
-        if (endDate) projectData.endDate = endDate;
-        if (budgetHours) projectData.budgetHours = budgetHours;
-        if (budgetAmount) projectData.budgetAmount = budgetAmount;
-        if (projectManagerId) projectData.projectManagerId = projectManagerId;
-
-        const projects = await ctx.projects.create([projectData]);
-        if (projects && projects.length > 0) {
-          return {
-            success: true,
-            projectId: projects[0].id,
-            name: projects[0].name,
+        try {
+          const projectData: Record<string, unknown> = {
+            name,
+            clientId,
+            isBillable,
           };
+
+          if (description) projectData.description = description;
+          if (startDate) projectData.startDate = startDate;
+          if (endDate) projectData.endDate = endDate;
+          if (budgetHours) projectData.budgetHours = budgetHours;
+          if (budgetAmount) projectData.budgetAmount = budgetAmount;
+          if (projectManagerId) projectData.projectManagerId = projectManagerId;
+
+          const projects = await ctx.projects.create([projectData]);
+          if (projects && projects.length > 0) {
+            return {
+              success: true,
+              projectId: projects[0].id,
+              name: projects[0].name,
+            };
+          }
+          return { success: false, error: 'Failed to create project' };
+        } catch (error) {
+          return formatError(error, 'createProject');
         }
-        return { success: false, error: 'Failed to create project' };
       },
     }),
 
@@ -379,21 +467,25 @@ export function createBillingTools(ctx: HaloContext) {
         budgetAmount: z.number().optional().describe('New budget amount'),
       }),
       execute: async ({ projectId, name, status, budgetHours, budgetAmount }) => {
-        const updateData: Record<string, unknown> = { id: projectId };
-        if (name !== undefined) updateData.name = name;
-        if (status !== undefined) updateData.status = status;
-        if (budgetHours !== undefined) updateData.budgetHours = budgetHours;
-        if (budgetAmount !== undefined) updateData.budgetAmount = budgetAmount;
+        try {
+          const updateData: Record<string, unknown> = { id: projectId };
+          if (name !== undefined) updateData.name = name;
+          if (status !== undefined) updateData.status = status;
+          if (budgetHours !== undefined) updateData.budgetHours = budgetHours;
+          if (budgetAmount !== undefined) updateData.budgetAmount = budgetAmount;
 
-        const projects = await ctx.projects.update([updateData]);
-        if (projects && projects.length > 0) {
-          return {
-            success: true,
-            projectId: projects[0].id,
-            name: projects[0].name,
-          };
+          const projects = await ctx.projects.update([updateData]);
+          if (projects && projects.length > 0) {
+            return {
+              success: true,
+              projectId: projects[0].id,
+              name: projects[0].name,
+            };
+          }
+          return { success: false, error: 'Failed to update project' };
+        } catch (error) {
+          return formatError(error, 'updateProject');
         }
-        return { success: false, error: 'Failed to update project' };
       },
     }),
 
@@ -410,24 +502,31 @@ export function createBillingTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ agentId, clientId, projectId, startDate, endDate, unbilledOnly, count }) => {
-        const expenses = await ctx.expenses.listFiltered({
-          agentId,
-          clientId,
-          projectId,
-          startDate,
-          endDate,
-          unbilledOnly,
-          count: count || DEFAULT_COUNT,
-        });
+        try {
+          const expenses = await ctx.expenses.listFiltered({
+            agentId,
+            clientId,
+            projectId,
+            startDate,
+            endDate,
+            unbilledOnly,
+            count: count || DEFAULT_COUNT,
+          });
 
-        return expenses.map((e: Expense) => ({
-          id: e.id,
-          description: e.description,
-          amount: e.amount,
-          date: e.expenseDate,
-          billable: e.billable,
-          category: e.category,
-        }));
+          return {
+            success: true,
+            data: expenses.map((e: Expense) => ({
+              id: e.id,
+              description: e.description,
+              amount: e.amount,
+              date: e.expenseDate,
+              billable: e.billable,
+              category: e.category,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listExpenses');
+        }
       },
     }),
 
@@ -445,28 +544,32 @@ export function createBillingTools(ctx: HaloContext) {
         reimbursable: z.boolean().optional().default(true).describe('Whether the expense is reimbursable'),
       }),
       execute: async ({ amount, description, expenseDate, category, ticketId, projectId, clientId, billable, reimbursable }) => {
-        const expenseData: Record<string, unknown> = {
-          amount,
-          description,
-          expenseDate,
-          billable,
-          reimbursable,
-        };
-
-        if (category) expenseData.category = category;
-        if (ticketId) expenseData.ticketId = ticketId;
-        if (projectId) expenseData.projectId = projectId;
-        if (clientId) expenseData.clientId = clientId;
-
-        const expenses = await ctx.expenses.create([expenseData]);
-        if (expenses && expenses.length > 0) {
-          return {
-            success: true,
-            expenseId: expenses[0].id,
-            amount: expenses[0].amount,
+        try {
+          const expenseData: Record<string, unknown> = {
+            amount,
+            description,
+            expenseDate,
+            billable,
+            reimbursable,
           };
+
+          if (category) expenseData.category = category;
+          if (ticketId) expenseData.ticketId = ticketId;
+          if (projectId) expenseData.projectId = projectId;
+          if (clientId) expenseData.clientId = clientId;
+
+          const expenses = await ctx.expenses.create([expenseData]);
+          if (expenses && expenses.length > 0) {
+            return {
+              success: true,
+              expenseId: expenses[0].id,
+              amount: expenses[0].amount,
+            };
+          }
+          return { success: false, error: 'Failed to create expense' };
+        } catch (error) {
+          return formatError(error, 'createExpense');
         }
-        return { success: false, error: 'Failed to create expense' };
       },
     }),
   };

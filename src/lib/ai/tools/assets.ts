@@ -14,6 +14,32 @@ function getAssetName(asset: Asset): string {
   return asset.deviceName || asset.keyField || asset.inventoryNumber || `Asset ${asset.id}`;
 }
 
+/**
+ * Format error for tool response.
+ */
+function formatError(error: unknown, toolName: string): { success: false; error: string } {
+  console.error(`[Tool:${toolName}] Error:`, error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
+  }
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
+  }
+  if (message.includes('404') || message.includes('Not Found')) {
+    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
+  }
+  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
+  }
+  if (message.includes('ECONNREFUSED') || message.includes('network')) {
+    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
+  }
+
+  return { success: false, error: `Operation failed: ${message}` };
+}
+
 export function createAssetTools(ctx: HaloContext) {
   return {
     listAssets: tool({
@@ -26,29 +52,36 @@ export function createAssetTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ clientId, siteId, assetTypeId, search, count }) => {
-        const limit = count || DEFAULT_COUNT;
+        try {
+          const limit = count || DEFAULT_COUNT;
 
-        let assets: Asset[];
-        if (search) {
-          assets = await ctx.assets.search(search, { count: limit });
-        } else if (clientId) {
-          assets = await ctx.assets.listByClient(clientId, { count: limit });
-        } else if (siteId) {
-          assets = await ctx.assets.listBySite(siteId, { count: limit });
-        } else if (assetTypeId) {
-          assets = await ctx.assets.listByType(assetTypeId, { count: limit });
-        } else {
-          assets = await ctx.assets.listActive({ count: limit });
+          let assets: Asset[];
+          if (search) {
+            assets = await ctx.assets.search(search, { count: limit });
+          } else if (clientId) {
+            assets = await ctx.assets.listByClient(clientId, { count: limit });
+          } else if (siteId) {
+            assets = await ctx.assets.listBySite(siteId, { count: limit });
+          } else if (assetTypeId) {
+            assets = await ctx.assets.listByType(assetTypeId, { count: limit });
+          } else {
+            assets = await ctx.assets.listActive({ count: limit });
+          }
+
+          return {
+            success: true,
+            assets: assets.map((a: Asset) => ({
+              id: a.id,
+              name: getAssetName(a),
+              type: a.assetTypeName,
+              client: a.clientName,
+              serial: a.serialNumber,
+              warrantyExpires: a.warrantyExpiry,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listAssets');
         }
-
-        return assets.map((a: Asset) => ({
-          id: a.id,
-          name: getAssetName(a),
-          type: a.assetTypeName,
-          client: a.clientName,
-          serial: a.serialNumber,
-          warrantyExpires: a.warrantyExpiry,
-        }));
       },
     }),
 
@@ -58,26 +91,31 @@ export function createAssetTools(ctx: HaloContext) {
         assetId: z.number().describe('The asset ID to retrieve'),
       }),
       execute: async ({ assetId }) => {
-        const asset = await ctx.assets.get(assetId);
-        const isExpired = asset.warrantyExpiry ? new Date() > new Date(asset.warrantyExpiry) : false;
-        return {
-          id: asset.id,
-          name: getAssetName(asset),
-          inventoryNumber: asset.inventoryNumber,
-          type: asset.assetTypeName,
-          status: asset.statusName,
-          client: asset.clientName,
-          site: asset.siteName,
-          user: asset.userName,
-          manufacturer: asset.manufacturer,
-          model: asset.model,
-          serial: asset.serialNumber,
-          ipAddress: asset.ipAddress,
-          purchaseDate: asset.purchaseDate,
-          warrantyExpires: asset.warrantyExpiry,
-          isWarrantyExpired: isExpired,
-          notes: asset.notes,
-        };
+        try {
+          const asset = await ctx.assets.get(assetId);
+          const isExpired = asset.warrantyExpiry ? new Date() > new Date(asset.warrantyExpiry) : false;
+          return {
+            success: true,
+            id: asset.id,
+            name: getAssetName(asset),
+            inventoryNumber: asset.inventoryNumber,
+            type: asset.assetTypeName,
+            status: asset.statusName,
+            client: asset.clientName,
+            site: asset.siteName,
+            user: asset.userName,
+            manufacturer: asset.manufacturer,
+            model: asset.model,
+            serial: asset.serialNumber,
+            ipAddress: asset.ipAddress,
+            purchaseDate: asset.purchaseDate,
+            warrantyExpires: asset.warrantyExpiry,
+            isWarrantyExpired: isExpired,
+            notes: asset.notes,
+          };
+        } catch (error) {
+          return formatError(error, 'getAsset');
+        }
       },
     }),
 
@@ -87,7 +125,12 @@ export function createAssetTools(ctx: HaloContext) {
         clientId: z.number().optional().describe('Filter stats by client ID'),
       }),
       execute: async ({ clientId }) => {
-        return ctx.assets.getSummaryStats({ clientId });
+        try {
+          const stats = await ctx.assets.getSummaryStats({ clientId });
+          return { success: true, ...stats };
+        } catch (error) {
+          return formatError(error, 'getAssetStats');
+        }
       },
     }),
 
@@ -98,18 +141,25 @@ export function createAssetTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ days, count }) => {
-        const assets = await ctx.assets.listWarrantyExpiring({
-          days: days || DEFAULT_WARRANTY_DAYS,
-          count: count || DEFAULT_COUNT,
-        });
+        try {
+          const assets = await ctx.assets.listWarrantyExpiring({
+            days: days || DEFAULT_WARRANTY_DAYS,
+            count: count || DEFAULT_COUNT,
+          });
 
-        return assets.map((a: Asset) => ({
-          id: a.id,
-          name: getAssetName(a),
-          type: a.assetTypeName,
-          client: a.clientName,
-          warrantyExpires: a.warrantyExpiry,
-        }));
+          return {
+            success: true,
+            assets: assets.map((a: Asset) => ({
+              id: a.id,
+              name: getAssetName(a),
+              type: a.assetTypeName,
+              client: a.clientName,
+              warrantyExpires: a.warrantyExpiry,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listWarrantyExpiring');
+        }
       },
     }),
 
@@ -119,15 +169,22 @@ export function createAssetTools(ctx: HaloContext) {
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
       }),
       execute: async ({ count }) => {
-        const assets = await ctx.assets.listWarrantyExpired({ count: count || DEFAULT_COUNT });
+        try {
+          const assets = await ctx.assets.listWarrantyExpired({ count: count || DEFAULT_COUNT });
 
-        return assets.map((a: Asset) => ({
-          id: a.id,
-          name: getAssetName(a),
-          type: a.assetTypeName,
-          client: a.clientName,
-          warrantyExpires: a.warrantyExpiry,
-        }));
+          return {
+            success: true,
+            assets: assets.map((a: Asset) => ({
+              id: a.id,
+              name: getAssetName(a),
+              type: a.assetTypeName,
+              client: a.clientName,
+              warrantyExpires: a.warrantyExpiry,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listWarrantyExpired');
+        }
       },
     }),
 
@@ -145,32 +202,36 @@ export function createAssetTools(ctx: HaloContext) {
         notes: z.string().optional().describe('Additional notes'),
       }),
       execute: async ({ inventoryNumber, clientId, siteId, assetTypeId, manufacturer, model, serialNumber, userId, notes }) => {
-        const assetData: Record<string, unknown> = {
-          inventoryNumber,
-          clientId,
-        };
-
-        if (siteId) assetData.siteId = siteId;
-        if (assetTypeId) assetData.assettypeId = assetTypeId;
-        if (manufacturer) assetData.manufacturer = manufacturer;
-        if (model) assetData.model = model;
-        if (serialNumber) assetData.serialNumber = serialNumber;
-        if (userId) assetData.userId = userId;
-        if (notes) assetData.notes = notes;
-
-        const assets = await ctx.assets.create([assetData]);
-        if (assets && assets.length > 0) {
-          const a = assets[0];
-          const name = getAssetName(a);
-          return {
-            success: true,
-            assetId: a.id,
-            name,
-            inventoryNumber: a.inventoryNumber,
-            message: `Asset '${name}' (ID: ${a.id}) created successfully`,
+        try {
+          const assetData: Record<string, unknown> = {
+            inventoryNumber,
+            clientId,
           };
+
+          if (siteId) assetData.siteId = siteId;
+          if (assetTypeId) assetData.assettypeId = assetTypeId;
+          if (manufacturer) assetData.manufacturer = manufacturer;
+          if (model) assetData.model = model;
+          if (serialNumber) assetData.serialNumber = serialNumber;
+          if (userId) assetData.userId = userId;
+          if (notes) assetData.notes = notes;
+
+          const assets = await ctx.assets.create([assetData]);
+          if (assets && assets.length > 0) {
+            const a = assets[0];
+            const name = getAssetName(a);
+            return {
+              success: true,
+              assetId: a.id,
+              name,
+              inventoryNumber: a.inventoryNumber,
+              message: `Asset '${name}' (ID: ${a.id}) created successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to create asset - no response from HaloPSA' };
+        } catch (error) {
+          return formatError(error, 'createAsset');
         }
-        return { success: false, error: 'Failed to create asset' };
       },
     }),
 
@@ -189,30 +250,34 @@ export function createAssetTools(ctx: HaloContext) {
         notes: z.string().optional().describe('New notes'),
       }),
       execute: async ({ assetId, inventoryNumber, assetTypeId, manufacturer, model, serialNumber, userId, siteId, statusId, notes }) => {
-        const updateData: Record<string, unknown> = { id: assetId };
+        try {
+          const updateData: Record<string, unknown> = { id: assetId };
 
-        if (inventoryNumber !== undefined) updateData.inventoryNumber = inventoryNumber;
-        if (assetTypeId !== undefined) updateData.assettypeId = assetTypeId;
-        if (manufacturer !== undefined) updateData.manufacturer = manufacturer;
-        if (model !== undefined) updateData.model = model;
-        if (serialNumber !== undefined) updateData.serialNumber = serialNumber;
-        if (userId !== undefined) updateData.userId = userId;
-        if (siteId !== undefined) updateData.siteId = siteId;
-        if (statusId !== undefined) updateData.statusId = statusId;
-        if (notes !== undefined) updateData.notes = notes;
+          if (inventoryNumber !== undefined) updateData.inventoryNumber = inventoryNumber;
+          if (assetTypeId !== undefined) updateData.assettypeId = assetTypeId;
+          if (manufacturer !== undefined) updateData.manufacturer = manufacturer;
+          if (model !== undefined) updateData.model = model;
+          if (serialNumber !== undefined) updateData.serialNumber = serialNumber;
+          if (userId !== undefined) updateData.userId = userId;
+          if (siteId !== undefined) updateData.siteId = siteId;
+          if (statusId !== undefined) updateData.statusId = statusId;
+          if (notes !== undefined) updateData.notes = notes;
 
-        const assets = await ctx.assets.update([updateData]);
-        if (assets && assets.length > 0) {
-          const a = assets[0];
-          const name = getAssetName(a);
-          return {
-            success: true,
-            assetId: a.id,
-            name,
-            message: `Asset '${name}' updated successfully`,
-          };
+          const assets = await ctx.assets.update([updateData]);
+          if (assets && assets.length > 0) {
+            const a = assets[0];
+            const name = getAssetName(a);
+            return {
+              success: true,
+              assetId: a.id,
+              name,
+              message: `Asset '${name}' updated successfully`,
+            };
+          }
+          return { success: false, error: 'Failed to update asset - no response from HaloPSA' };
+        } catch (error) {
+          return formatError(error, 'updateAsset');
         }
-        return { success: false, error: 'Failed to update asset' };
       },
     }),
 
@@ -220,12 +285,19 @@ export function createAssetTools(ctx: HaloContext) {
       description: 'List available asset types.',
       parameters: z.object({}),
       execute: async () => {
-        const types = await ctx.assets.types.list();
-        return types.map((t: AssetType) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-        }));
+        try {
+          const types = await ctx.assets.types.list();
+          return {
+            success: true,
+            types: types.map((t: AssetType) => ({
+              id: t.id,
+              name: t.name,
+              description: t.description,
+            })),
+          };
+        } catch (error) {
+          return formatError(error, 'listAssetTypes');
+        }
       },
     }),
   };
