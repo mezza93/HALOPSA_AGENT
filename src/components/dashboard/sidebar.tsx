@@ -14,6 +14,7 @@ import {
   BookOpen,
   ChevronRight,
   Lightbulb,
+  Map,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils/cn';
@@ -35,7 +36,7 @@ const navigation = [
   { name: 'History', href: '/chat/history', icon: History, shortcut: '2', description: 'Past conversations' },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, shortcut: '3', description: 'HaloPSA configuration' },
   { name: 'Opportunities', href: '/opportunities', icon: Lightbulb, shortcut: '4', description: 'Optimization suggestions' },
-  { name: 'Connections', href: '/settings/connections', icon: Link2, shortcut: '5', description: 'Manage API connections' },
+  { name: 'Roadmap', href: '/roadmap', icon: Map, shortcut: '5', description: 'Product roadmap' },
   { name: 'Settings', href: '/settings', icon: Settings, shortcut: '6', description: 'Account preferences' },
 ];
 

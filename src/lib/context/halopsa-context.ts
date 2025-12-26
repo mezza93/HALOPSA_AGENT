@@ -183,6 +183,59 @@ export const DASHBOARD_CONTEXT = `## HaloPSA Dashboard & Reporting
 `;
 
 /**
+ * HaloPSA API Reference - Key Endpoints
+ */
+export const API_REFERENCE = `## HaloPSA API Endpoints Reference
+
+### Core Endpoints
+| Endpoint | Methods | Description |
+|----------|---------|-------------|
+| /Tickets | GET, POST | List/search tickets, create tickets |
+| /Tickets/{id} | GET, POST, DELETE | Get/update/delete specific ticket |
+| /Actions | GET, POST | Ticket actions/notes |
+| /Client | GET, POST | Client management |
+| /Site | GET, POST | Site management |
+| /Users | GET, POST | End-user management |
+| /Agent | GET, POST | Agent management |
+| /Team | GET | Team/department info |
+| /Asset | GET, POST | Asset/device management |
+| /Contract | GET, POST | Contract management |
+| /Invoice | GET, POST | Invoice management |
+| /Report | GET, POST | Report execution |
+| /KBArticle | GET, POST | Knowledge base articles |
+
+### Configuration Endpoints
+| Endpoint | Description |
+|----------|-------------|
+| /Status | Ticket statuses |
+| /Priority | Priorities |
+| /TicketType | Ticket types |
+| /Category | Categories |
+| /CustomField | Custom fields |
+| /Workflow | Automation workflows |
+| /EmailTemplate | Email templates |
+| /SLA | SLA definitions |
+
+### Common Query Parameters
+- \`count\` - Number of records to return (default: 50)
+- \`page_no\` - Page number for pagination
+- \`search\` - Text search across records
+- \`order\` - Sort field
+- \`orderdesc\` - Sort descending (true/false)
+- \`ticketidonly\` - Return only ticket IDs (faster)
+
+### Filtering Tickets
+- \`client_id\` - Filter by client
+- \`site_id\` - Filter by site
+- \`agent_id\` - Filter by assigned agent
+- \`status_id\` - Filter by status
+- \`priority_id\` - Filter by priority
+- \`tickettype_id\` - Filter by ticket type
+- \`open_only\` - Only open tickets
+- \`dateoccured_start/end\` - Date range filter
+`;
+
+/**
  * Get the full HaloPSA context for the AI agent.
  */
 export function getHaloPSAContext(): string {
@@ -194,6 +247,8 @@ ${SQL_EXAMPLES}
 ${HALOPSA_VARIABLES}
 
 ${DASHBOARD_CONTEXT}
+
+${API_REFERENCE}
 
 ### Tips for Users
 - For reports, use the runReport or createReport tools

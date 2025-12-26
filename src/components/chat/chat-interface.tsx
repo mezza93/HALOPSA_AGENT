@@ -108,7 +108,17 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col relative">
+      {/* Grainy texture overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0 opacity-[0.015]">
+        <svg className="w-full h-full">
+          <filter id="chat-noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/>
+          </filter>
+          <rect width="100%" height="100%" filter="url(#chat-noise)"/>
+        </svg>
+      </div>
+
       {/* Chat header */}
       <ChatHeader
         connectionName={activeConnection?.name}
@@ -117,7 +127,7 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
       />
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-6 relative z-10">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 ? (
             <ChatWelcome onQuickAction={handleQuickAction} />
