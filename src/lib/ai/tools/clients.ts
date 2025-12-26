@@ -202,5 +202,185 @@ export function createClientTools(ctx: HaloContext) {
         return { success: false, error: 'Failed to create user' };
       },
     }),
+
+    updateUser: tool({
+      description: 'Update an existing user/contact.',
+      parameters: z.object({
+        userId: z.number().describe('The user ID to update'),
+        name: z.string().optional().describe('New name'),
+        email: z.string().optional().describe('New email address'),
+        phone: z.string().optional().describe('New phone number'),
+        siteId: z.number().optional().describe('New site ID'),
+        isVip: z.boolean().optional().describe('Whether this is a VIP user'),
+        inactive: z.boolean().optional().describe('Inactive status'),
+      }),
+      execute: async ({ userId, name, email, phone, siteId, isVip, inactive }) => {
+        const updateData: Record<string, unknown> = { id: userId };
+        if (name !== undefined) updateData.name = name;
+        if (email !== undefined) updateData.emailaddress = email;
+        if (phone !== undefined) updateData.phonenumber = phone;
+        if (siteId !== undefined) updateData.site_id = siteId;
+        if (isVip !== undefined) updateData.isimportantcontact = isVip;
+        if (inactive !== undefined) updateData.inactive = inactive;
+
+        const users = await ctx.clients.users.update([updateData]);
+        if (users && users.length > 0) {
+          const u = users[0];
+          return {
+            success: true,
+            userId: u.id,
+            name: u.name,
+            message: `User '${u.name}' updated successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to update user' };
+      },
+    }),
+
+    getUser: tool({
+      description: 'Get detailed information about a specific user/contact.',
+      parameters: z.object({
+        userId: z.number().describe('The user ID to retrieve'),
+      }),
+      execute: async ({ userId }) => {
+        const user = await ctx.clients.users.get(userId);
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.emailAddress,
+          phone: user.phoneNumber,
+          clientId: user.clientId,
+          clientName: user.clientName,
+          siteId: user.siteId,
+          siteName: user.siteName,
+          isActive: !user.inactive,
+          isVip: user.isImportantContact,
+        };
+      },
+    }),
+
+    createSite: tool({
+      description: 'Create a new site/location for a client.',
+      parameters: z.object({
+        clientId: z.number().describe('The client ID'),
+        name: z.string().describe('Site name'),
+        line1: z.string().optional().describe('Address line 1'),
+        line2: z.string().optional().describe('Address line 2'),
+        city: z.string().optional().describe('City'),
+        postcode: z.string().optional().describe('Postal/ZIP code'),
+        country: z.string().optional().describe('Country'),
+        phone: z.string().optional().describe('Phone number'),
+        isMainSite: z.boolean().optional().describe('Whether this is the main site'),
+      }),
+      execute: async ({ clientId, name, line1, line2, city, postcode, country, phone, isMainSite }) => {
+        const siteData: Record<string, unknown> = { client_id: clientId, name };
+        if (line1) siteData.line1 = line1;
+        if (line2) siteData.line2 = line2;
+        if (city) siteData.line3 = city;
+        if (postcode) siteData.postcode = postcode;
+        if (country) siteData.country = country;
+        if (phone) siteData.phonenumber = phone;
+        if (isMainSite) siteData.mainsite = isMainSite;
+
+        const sites = await ctx.clients.sites.create([siteData]);
+        if (sites && sites.length > 0) {
+          const s = sites[0];
+          return {
+            success: true,
+            siteId: s.id,
+            name: s.name,
+            message: `Site '${s.name}' created successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to create site' };
+      },
+    }),
+
+    updateSite: tool({
+      description: 'Update an existing site/location.',
+      parameters: z.object({
+        siteId: z.number().describe('The site ID to update'),
+        name: z.string().optional().describe('New name'),
+        line1: z.string().optional().describe('Address line 1'),
+        line2: z.string().optional().describe('Address line 2'),
+        city: z.string().optional().describe('City'),
+        postcode: z.string().optional().describe('Postal/ZIP code'),
+        country: z.string().optional().describe('Country'),
+        phone: z.string().optional().describe('Phone number'),
+        inactive: z.boolean().optional().describe('Inactive status'),
+      }),
+      execute: async ({ siteId, name, line1, line2, city, postcode, country, phone, inactive }) => {
+        const updateData: Record<string, unknown> = { id: siteId };
+        if (name !== undefined) updateData.name = name;
+        if (line1 !== undefined) updateData.line1 = line1;
+        if (line2 !== undefined) updateData.line2 = line2;
+        if (city !== undefined) updateData.line3 = city;
+        if (postcode !== undefined) updateData.postcode = postcode;
+        if (country !== undefined) updateData.country = country;
+        if (phone !== undefined) updateData.phonenumber = phone;
+        if (inactive !== undefined) updateData.inactive = inactive;
+
+        const sites = await ctx.clients.sites.update([updateData]);
+        if (sites && sites.length > 0) {
+          const s = sites[0];
+          return {
+            success: true,
+            siteId: s.id,
+            name: s.name,
+            message: `Site '${s.name}' updated successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to update site' };
+      },
+    }),
+
+    getSite: tool({
+      description: 'Get detailed information about a specific site.',
+      parameters: z.object({
+        siteId: z.number().describe('The site ID to retrieve'),
+      }),
+      execute: async ({ siteId }) => {
+        const site = await ctx.clients.sites.get(siteId);
+        return {
+          id: site.id,
+          name: site.name,
+          clientId: site.clientId,
+          address: formatSiteAddress(site),
+          phone: site.phoneNumber,
+          isActive: !site.inactive,
+          isMainSite: site.mainSite,
+        };
+      },
+    }),
+
+    getClientStats: tool({
+      description: 'Get summary statistics about clients including active/inactive counts and top clients by open tickets.',
+      parameters: z.object({}),
+      execute: async () => {
+        const [activeClients, allClients] = await Promise.all([
+          ctx.clients.listActive({ count: 100 }),
+          ctx.clients.list({ count: 100 }),
+        ]);
+
+        const activeCount = activeClients.length;
+        const inactiveCount = allClients.filter((c: Client) => c.inactive).length;
+        const topByTickets = allClients
+          .filter((c: Client) => !c.inactive && (c.openTicketCount || 0) > 0)
+          .sort((a: Client, b: Client) => (b.openTicketCount || 0) - (a.openTicketCount || 0))
+          .slice(0, 10)
+          .map((c: Client) => ({
+            id: c.id,
+            name: c.name,
+            openTickets: c.openTicketCount,
+          }));
+
+        return {
+          totalActive: activeCount,
+          totalInactive: inactiveCount,
+          totalClients: activeCount + inactiveCount,
+          topClientsByOpenTickets: topByTickets,
+        };
+      },
+    }),
   };
 }

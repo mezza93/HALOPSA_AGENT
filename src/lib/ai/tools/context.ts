@@ -17,6 +17,8 @@ export interface HaloContext {
   expenses: ReturnType<typeof createHaloServices>['expenses'];
   contracts: ReturnType<typeof createHaloServices>['contracts'];
   reports: ReturnType<typeof createHaloServices>['reports'];
+  configuration: ReturnType<typeof createHaloServices>['configuration'];
+  attachments: ReturnType<typeof createHaloServices>['attachments'];
 }
 
 /**
@@ -41,5 +43,7 @@ export function createHaloContext(config: {
     expenses: services.expenses,
     contracts: services.contracts,
     reports: services.reports,
+    configuration: services.configuration,
+    attachments: services.attachments,
   };
 }

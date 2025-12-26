@@ -142,6 +142,95 @@ export function createBillingTools(ctx: HaloContext) {
       },
     }),
 
+    createInvoice: tool({
+      description: 'Create a new invoice for a client.',
+      parameters: z.object({
+        clientId: z.number().describe('Client ID'),
+        dateDue: z.string().optional().describe('Due date (YYYY-MM-DD)'),
+        description: z.string().optional().describe('Invoice description/notes'),
+        lines: z.array(z.object({
+          description: z.string().describe('Line item description'),
+          quantity: z.number().describe('Quantity'),
+          unitPrice: z.number().describe('Unit price'),
+          taxable: z.boolean().optional().describe('Whether the line is taxable'),
+        })).optional().describe('Invoice line items'),
+      }),
+      execute: async ({ clientId, dateDue, description, lines }) => {
+        const invoiceData: Record<string, unknown> = {
+          client_id: clientId,
+        };
+        if (dateDue) invoiceData.datedue = dateDue;
+        if (description) invoiceData.description = description;
+        if (lines) {
+          invoiceData.lines = lines.map((line) => ({
+            description: line.description,
+            quantity: line.quantity,
+            unitprice: line.unitPrice,
+            taxable: line.taxable,
+          }));
+        }
+
+        const invoices = await ctx.invoices.create([invoiceData]);
+        if (invoices && invoices.length > 0) {
+          return {
+            success: true,
+            invoiceId: invoices[0].id,
+            invoiceNumber: invoices[0].invoiceNumber,
+            total: invoices[0].totalAmount,
+            message: `Invoice ${invoices[0].invoiceNumber} created successfully`,
+          };
+        }
+        return { success: false, error: 'Failed to create invoice' };
+      },
+    }),
+
+    createInvoiceFromTime: tool({
+      description: 'Create an invoice from unbilled time entries for a client.',
+      parameters: z.object({
+        clientId: z.number().describe('Client ID'),
+        startDate: z.string().optional().describe('Start date for time entries (YYYY-MM-DD)'),
+        endDate: z.string().optional().describe('End date for time entries (YYYY-MM-DD)'),
+        dateDue: z.string().optional().describe('Invoice due date (YYYY-MM-DD)'),
+        includeExpenses: z.boolean().optional().default(false).describe('Include unbilled expenses'),
+      }),
+      execute: async ({ clientId, startDate, endDate, dateDue, includeExpenses }) => {
+        // Get unbilled time entries for the client
+        const timeEntries = await ctx.timeEntries.listFiltered({
+          clientId,
+          startDate,
+          endDate,
+          unbilledOnly: true,
+          billableOnly: true,
+          count: 1000,
+        });
+
+        if (timeEntries.length === 0) {
+          return {
+            success: false,
+            error: 'No unbilled time entries found for this client in the specified date range',
+          };
+        }
+
+        // Create invoice data
+        const invoiceData: Record<string, unknown> = {
+          client_id: clientId,
+        };
+        if (dateDue) invoiceData.datedue = dateDue;
+
+        const invoices = await ctx.invoices.create([invoiceData]);
+        if (invoices && invoices.length > 0) {
+          return {
+            success: true,
+            invoiceId: invoices[0].id,
+            invoiceNumber: invoices[0].invoiceNumber,
+            timeEntriesIncluded: timeEntries.length,
+            message: `Invoice ${invoices[0].invoiceNumber} created from ${timeEntries.length} time entries`,
+          };
+        }
+        return { success: false, error: 'Failed to create invoice from time entries' };
+      },
+    }),
+
     sendInvoice: tool({
       description: 'Send an invoice to the client.',
       parameters: z.object({

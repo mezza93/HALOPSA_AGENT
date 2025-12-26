@@ -29,3 +29,16 @@ export { ContractService, SLAService, RecurringServiceService } from './contract
 
 // Report services
 export { ReportService, ScheduledReportService, DashboardService } from './reports';
+
+// Configuration services
+export { ConfigurationService } from './configuration';
+// Note: CustomField, TicketStatus, TicketType, Priority, Category, Team are exported from ../types
+export type {
+  Workflow,
+  EmailTemplate,
+  TicketTemplate,
+} from './configuration';
+
+// Attachment services
+export { AttachmentService } from './attachments';
+export type { Attachment } from './attachments';

@@ -64,6 +64,8 @@ export function createHaloServices(config: {
   const { TimeEntryService, InvoiceService, ProjectService, ExpenseService } = require('./services/billing');
   const { ContractService } = require('./services/contracts');
   const { ReportService } = require('./services/reports');
+  const { ConfigurationService } = require('./services/configuration');
+  const { AttachmentService } = require('./services/attachments');
 
   const client = new HaloPSAClient(config);
 
@@ -85,5 +87,9 @@ export function createHaloServices(config: {
     contracts: new ContractService(client),
     // Reports & Dashboards
     reports: new ReportService(client),
+    // Configuration
+    configuration: new ConfigurationService(client),
+    // Attachments
+    attachments: new AttachmentService(client),
   };
 }

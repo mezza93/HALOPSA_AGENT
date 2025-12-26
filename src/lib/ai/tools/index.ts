@@ -23,6 +23,8 @@ import { createBillingTools } from './billing';
 import { createKnowledgeBaseTools } from './knowledgebase';
 import { createContractTools } from './contracts';
 import { createReportTools } from './reports';
+import { createConfigurationTools } from './configuration';
+import { createAttachmentTools } from './attachments';
 
 export { createHaloContext, type HaloContext } from './context';
 
@@ -39,6 +41,8 @@ export function createHaloTools(ctx: HaloContext): Record<string, CoreTool> {
     ...createKnowledgeBaseTools(ctx),
     ...createContractTools(ctx),
     ...createReportTools(ctx),
+    ...createConfigurationTools(ctx),
+    ...createAttachmentTools(ctx),
   };
 }
 
@@ -82,9 +86,15 @@ export function getToolNames(): string[] {
     'getClient',
     'createClient',
     'updateClient',
+    'getClientStats',
     'listSites',
+    'getSite',
+    'createSite',
+    'updateSite',
     'listUsers',
+    'getUser',
     'createUser',
+    'updateUser',
     // Agent tools
     'listAgents',
     'getAgent',
@@ -106,6 +116,8 @@ export function getToolNames(): string[] {
     'getTimeSummary',
     'listInvoices',
     'getInvoice',
+    'createInvoice',
+    'createInvoiceFromTime',
     'sendInvoice',
     'markInvoicePaid',
     'getInvoiceSummary',
@@ -150,6 +162,28 @@ export function getToolNames(): string[] {
     'getDashboard',
     'createDashboard',
     'addDashboardWidget',
+    // Configuration tools
+    'listCustomFields',
+    'getCustomField',
+    'listTicketStatuses',
+    'listTicketTypes',
+    'listPriorities',
+    'listCategories',
+    'listWorkflows',
+    'getWorkflow',
+    'toggleWorkflow',
+    'listEmailTemplates',
+    'getEmailTemplate',
+    'createEmailTemplate',
+    'listTicketTemplates',
+    'getTicketTemplate',
+    'createTicketFromTemplate',
+    'createTicketTemplate',
+    // Attachment tools
+    'listTicketAttachments',
+    'getAttachment',
+    'deleteAttachment',
+    'copyAttachments',
   ];
 }
 
@@ -180,9 +214,15 @@ export const toolCategories = {
     'getClient',
     'createClient',
     'updateClient',
+    'getClientStats',
     'listSites',
+    'getSite',
+    'createSite',
+    'updateSite',
     'listUsers',
+    'getUser',
     'createUser',
+    'updateUser',
   ],
   agents: [
     'listAgents',
@@ -207,6 +247,8 @@ export const toolCategories = {
     'getTimeSummary',
     'listInvoices',
     'getInvoice',
+    'createInvoice',
+    'createInvoiceFromTime',
     'sendInvoice',
     'markInvoicePaid',
     'getInvoiceSummary',
@@ -254,5 +296,29 @@ export const toolCategories = {
     'getDashboard',
     'createDashboard',
     'addDashboardWidget',
+  ],
+  configuration: [
+    'listCustomFields',
+    'getCustomField',
+    'listTicketStatuses',
+    'listTicketTypes',
+    'listPriorities',
+    'listCategories',
+    'listWorkflows',
+    'getWorkflow',
+    'toggleWorkflow',
+    'listEmailTemplates',
+    'getEmailTemplate',
+    'createEmailTemplate',
+    'listTicketTemplates',
+    'getTicketTemplate',
+    'createTicketFromTemplate',
+    'createTicketTemplate',
+  ],
+  attachments: [
+    'listTicketAttachments',
+    'getAttachment',
+    'deleteAttachment',
+    'copyAttachments',
   ],
 } as const;
