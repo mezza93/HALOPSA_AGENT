@@ -441,6 +441,9 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
 
   /**
    * Create a custom report with SQL query.
+   * Note: HaloPSA API expects lowercase snake_case field names:
+   * - 'sql' for the SQL query (not sqlQuery)
+   * - 'isshared' for sharing flag (not isShared)
    */
   async createCustomReport(options: {
     name: string;
@@ -451,16 +454,30 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
   }): Promise<Report> {
     const { name, sqlQuery, description, category, isShared = false } = options;
 
-    const data: Partial<Report> = {
+    // Build API payload with correct field names
+    const apiData: Record<string, unknown> = {
       name,
-      sqlQuery,
-      isShared,
+      sql: sqlQuery,       // API expects 'sql' not 'sqlQuery'
+      isshared: isShared,  // API expects 'isshared' not 'isShared'
     };
 
-    if (description) data.description = description;
-    if (category) data.category = category;
+    if (description) apiData.description = description;
+    if (category) apiData.category = category;
 
-    const results = await this.create([data]);
-    return results[0];
+    // Post directly to ensure correct field names are used
+    const response = await this.client.post<ReportApiResponse[] | ReportApiResponse>(
+      this.endpoint,
+      [apiData]
+    );
+
+    // Handle response which may be array or single object
+    if (Array.isArray(response) && response.length > 0) {
+      return this.transform(response[0]);
+    } else if (response && typeof response === 'object' && 'id' in response) {
+      return this.transform(response as ReportApiResponse);
+    }
+
+    // Fallback - return minimal report object
+    return { id: 0, name, isShared: false };
   }
 }
