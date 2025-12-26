@@ -25,6 +25,7 @@ import { createContractTools } from './contracts';
 import { createReportTools } from './reports';
 import { createConfigurationTools } from './configuration';
 import { createAttachmentTools } from './attachments';
+import { createDashboardBuilderTools } from './dashboard-builder';
 
 export { createHaloContext, type HaloContext } from './context';
 
@@ -43,6 +44,7 @@ export function createHaloTools(ctx: HaloContext): Record<string, CoreTool> {
     ...createReportTools(ctx),
     ...createConfigurationTools(ctx),
     ...createAttachmentTools(ctx),
+    ...createDashboardBuilderTools(ctx),
   };
 }
 
@@ -206,6 +208,12 @@ export function getToolNames(): string[] {
     'deleteAttachment',
     'copyAttachments',
     'uploadAttachment',
+    // Dashboard builder tools
+    'smartBuildDashboard',
+    'smartBuildCustomDashboard',
+    'suggestDashboardWidgets',
+    'listDashboardTemplates',
+    'findReportForWidget',
   ];
 }
 
@@ -327,6 +335,12 @@ export const toolCategories = {
     'getDashboard',
     'createDashboard',
     'addDashboardWidget',
+    // Smart dashboard builder
+    'smartBuildDashboard',
+    'smartBuildCustomDashboard',
+    'suggestDashboardWidgets',
+    'listDashboardTemplates',
+    'findReportForWidget',
   ],
   configuration: [
     'listCustomFields',

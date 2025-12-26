@@ -189,6 +189,9 @@ export class DashboardService extends BaseService<Dashboard, DashboardApiRespons
       w?: number;
       h?: number;
       colour?: string;
+      viewType?: string;
+      counterType?: number;
+      countFormatType?: number;
     }>;
   }): Promise<Dashboard> {
     const { name, description, widgets } = options;
@@ -211,6 +214,10 @@ export class DashboardService extends BaseService<Dashboard, DashboardApiRespons
         if (w.filterId) widgetData.filter_id = w.filterId;
         if (w.ticketAreaId) widgetData.ticketarea_id = w.ticketAreaId;
         if (w.colour) widgetData.initialcolour = w.colour;
+        // Additional properties for filter-based widgets
+        if (w.viewType !== undefined) widgetData.view_type = w.viewType;
+        if (w.counterType !== undefined) widgetData.counter_type = w.counterType;
+        if (w.countFormatType !== undefined) widgetData.count_format_type = w.countFormatType;
         return widgetData;
       });
     }
