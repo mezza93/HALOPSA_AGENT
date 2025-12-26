@@ -41,6 +41,9 @@ function LoginForm() {
 
       if (result?.ok) {
         toast.success('Signed in successfully!');
+        // Small delay to ensure cookie is set before redirect
+        // This helps avoid race conditions with session establishment
+        await new Promise(resolve => setTimeout(resolve, 100));
         // Use window.location for reliable redirect after auth
         window.location.href = callbackUrl;
         return;

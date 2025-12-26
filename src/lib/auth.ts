@@ -38,6 +38,19 @@ const authConfig: NextAuthConfig = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production'
+        ? '__Secure-authjs.session-token'
+        : 'authjs.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   pages: {
     signIn: '/login',
     error: '/login',
@@ -113,12 +126,20 @@ const authConfig: NextAuthConfig = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      // Initial sign in
+    async jwt({ token, user, trigger, session, account }) {
+      // Initial sign in - user object is only available on sign in
       if (user) {
         token.id = user.id;
-        token.role = user.role;
-        token.plan = user.plan;
+        token.role = user.role || 'USER';
+        token.plan = user.plan || 'FREE';
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
+      }
+
+      // For credentials provider, ensure we have all required fields
+      if (account?.provider === 'credentials' && user) {
+        token.sub = user.id;
       }
 
       // Handle session updates

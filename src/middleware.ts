@@ -105,9 +105,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Get the session token
+  // Note: In production, the cookie name is prefixed with __Secure-
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET
+    secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+    cookieName: process.env.NODE_ENV === 'production'
+      ? '__Secure-authjs.session-token'
+      : 'authjs.session-token',
   });
 
   // Redirect authenticated users away from auth pages
