@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/utils/encryption';
 import { createHaloToolsFromConfig, toolCategories } from '@/lib/ai/tools';
+import { getHaloPSAContext } from '@/lib/context/halopsa-context';
 
 // System prompt for the AI agent
 const SYSTEM_PROMPT = `You are an AI assistant for HaloPSA, a Professional Services Automation (PSA) platform used by IT Managed Service Providers (MSPs). You help technicians and managers interact with their HaloPSA data through natural language.
@@ -86,7 +87,9 @@ When responding:
 5. Use proper technical terminology appropriate for IT professionals
 6. If an operation fails, explain what went wrong and suggest alternatives
 
-Always use the available tools to fetch real data - never make up information.`;
+Always use the available tools to fetch real data - never make up information.
+
+${getHaloPSAContext()}`;
 
 export async function POST(req: Request) {
   try {
@@ -96,7 +99,7 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const { messages, connectionId } = await req.json();
+    const { messages, connectionId, sessionId: existingSessionId } = await req.json();
 
     // Get connection details
     let tools = {};
@@ -190,6 +193,45 @@ export async function POST(req: Request) {
       connectionContext = '\n\nNo HaloPSA connection configured. Please set up a connection in Settings to use HaloPSA tools.';
     }
 
+    // Get or create chat session
+    let chatSessionId = existingSessionId;
+    if (!chatSessionId && messages.length > 0) {
+      // Create a new session with the first user message as title
+      const firstUserMessage = messages.find((m: { role: string }) => m.role === 'user');
+      const title = firstUserMessage?.content?.slice(0, 100) || 'New conversation';
+
+      const chatSession = await prisma.chatSession.create({
+        data: {
+          userId: session.user.id,
+          connectionId: connection?.id || null,
+          title,
+        },
+      });
+      chatSessionId = chatSession.id;
+    }
+
+    // Save the user's message to the database
+    if (chatSessionId && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'user') {
+        await prisma.chatMessage.create({
+          data: {
+            sessionId: chatSessionId,
+            role: 'USER',
+            content: typeof lastMessage.content === 'string'
+              ? lastMessage.content
+              : JSON.stringify(lastMessage.content),
+          },
+        });
+
+        // Update session last message time
+        await prisma.chatSession.update({
+          where: { id: chatSessionId },
+          data: { lastMessageAt: new Date() },
+        });
+      }
+    }
+
     // Stream the response
     const result = streamText({
       model: anthropic('claude-sonnet-4-20250514'),
@@ -197,7 +239,36 @@ export async function POST(req: Request) {
       messages,
       tools,
       maxSteps: 15, // Allow multiple tool calls for complex operations
-      onFinish: async ({ usage }) => {
+      onFinish: async ({ text, usage, toolCalls, toolResults }) => {
+        // Save assistant message to database
+        if (chatSessionId && text) {
+          try {
+            await prisma.chatMessage.create({
+              data: {
+                sessionId: chatSessionId,
+                role: 'ASSISTANT',
+                content: text,
+                toolCalls: toolCalls ? JSON.stringify(toolCalls) : undefined,
+                toolResults: toolResults ? JSON.stringify(toolResults) : undefined,
+                inputTokens: usage?.promptTokens || 0,
+                outputTokens: usage?.completionTokens || 0,
+              },
+            });
+
+            // Update session token count
+            await prisma.chatSession.update({
+              where: { id: chatSessionId },
+              data: {
+                tokensUsed: {
+                  increment: (usage?.promptTokens || 0) + (usage?.completionTokens || 0),
+                },
+              },
+            });
+          } catch (err) {
+            console.error('Failed to save assistant message:', err);
+          }
+        }
+
         // Log usage for billing
         if (usage) {
           try {
@@ -232,9 +303,27 @@ export async function POST(req: Request) {
     return result.toDataStreamResponse();
   } catch (error) {
     console.error('Chat API error:', error);
+
+    // Provide more specific error messages
+    let errorMessage = 'Internal server error';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        errorMessage = 'AI service configuration error. Please contact support.';
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+        statusCode = 429;
+      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+        errorMessage = 'Connection error. Please check your internet and try again.';
+      } else if (error.message.includes('decrypt')) {
+        errorMessage = 'HaloPSA connection error. Please reconfigure your connection in Settings.';
+      }
+    }
+
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMessage }),
+      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

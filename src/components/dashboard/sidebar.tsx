@@ -12,7 +12,6 @@ import {
   Sparkles,
   LogOut,
   BookOpen,
-  Command,
   ChevronRight,
   Lightbulb,
 } from 'lucide-react';
@@ -140,21 +139,6 @@ export function DashboardSidebar({ user }: SidebarProps) {
             </>
           )}
         </nav>
-
-        {/* Quick tips */}
-        <div className="mx-4 mb-4 rounded-xl bg-gradient-to-br from-turquoise-50 to-turquoise-100 p-4 border border-turquoise-200">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-turquoise-500/20">
-              <Command className="h-4 w-4 text-turquoise-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-turquoise-700">Pro Tip</p>
-              <p className="text-xs text-turquoise-600/80 mt-0.5">
-                Press number keys 1-6 to quickly navigate between sections.
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Footer */}
         <div className="border-t border-gray-200 p-4">
