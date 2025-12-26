@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 async function getKnowledgeBaseData(userId: string) {
-  const [kbItems, syncStatus] = await Promise.all([
+  const [kbItemsRaw, syncStatusRaw] = await Promise.all([
     prisma.knowledgeBaseItem.findMany({
       where: { userId },
       orderBy: [
@@ -23,6 +23,32 @@ async function getKnowledgeBaseData(userId: string) {
       orderBy: { syncedAt: 'desc' },
     }),
   ]);
+
+  // Transform dates to strings for the component
+  const kbItems = kbItemsRaw.map((item) => ({
+    id: item.id,
+    category: item.category,
+    subcategory: item.subcategory,
+    title: item.title,
+    content: item.content,
+    summary: item.summary,
+    sourceId: item.sourceId,
+    sourceName: item.sourceName,
+    updatedAt: item.updatedAt.toISOString(),
+  }));
+
+  const syncStatus = syncStatusRaw
+    ? {
+        id: syncStatusRaw.id,
+        status: syncStatusRaw.status,
+        syncType: syncStatusRaw.syncType,
+        itemsAdded: syncStatusRaw.itemsAdded,
+        itemsUpdated: syncStatusRaw.itemsUpdated,
+        itemsRemoved: syncStatusRaw.itemsRemoved,
+        errorCount: syncStatusRaw.errorCount,
+        syncedAt: syncStatusRaw.syncedAt.toISOString(),
+      }
+    : null;
 
   return { kbItems, syncStatus };
 }
