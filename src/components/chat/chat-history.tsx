@@ -238,7 +238,7 @@ export function ChatHistory({ sessions: initialSessions }: ChatHistoryProps) {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(session.id)}
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

@@ -133,12 +133,12 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
 
           {/* Error state */}
           {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-600 dark:text-red-400">
+            <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-600">
               <p className="font-medium">Error</p>
               <p>{error.message}</p>
               <button
                 onClick={() => reload()}
-                className="mt-2 text-red-700 dark:text-red-300 underline"
+                className="mt-2 text-red-700 underline"
               >
                 Try again
               </button>

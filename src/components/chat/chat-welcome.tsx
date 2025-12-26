@@ -37,7 +37,7 @@ export function ChatWelcome({ onQuickAction }: ChatWelcomeProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       {/* Welcome icon */}
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100">
         <Sparkles className="h-10 w-10 text-turquoise-500" />
       </div>
 
@@ -54,9 +54,9 @@ export function ChatWelcome({ onQuickAction }: ChatWelcomeProps) {
           <button
             key={index}
             onClick={() => onQuickAction(action.action)}
-            className="group flex items-start gap-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-left transition-all hover:border-turquoise-300 dark:hover:border-turquoise-700 hover:shadow-glow-sm"
+            className="group flex items-start gap-4 rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-turquoise-300 hover:shadow-glow-sm"
           >
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-600 dark:text-turquoise-400 transition-all group-hover:scale-110">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-turquoise-100 text-turquoise-600 transition-all group-hover:scale-110">
               <action.icon className="h-5 w-5" />
             </div>
             <div>
@@ -81,7 +81,7 @@ export function ChatWelcome({ onQuickAction }: ChatWelcomeProps) {
             <button
               key={index}
               onClick={() => onQuickAction(query)}
-              className="rounded-full bg-gray-100 dark:bg-gray-800 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-turquoise-100 dark:hover:bg-turquoise-900/30 hover:text-turquoise-700 dark:hover:text-turquoise-300"
+              className="rounded-full bg-gray-100 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-turquoise-100 hover:text-turquoise-700"
             >
               "{query}"
             </button>

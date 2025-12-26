@@ -15,17 +15,17 @@ interface ChatHeaderProps {
 export function ChatHeader({ connectionName, onClear, isLoading }: ChatHeaderProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-background/80 backdrop-blur-lg px-4 py-3">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-background/80 backdrop-blur-lg px-4 py-3">
         {/* Connection status */}
         <div className="flex items-center gap-3">
           {connectionName ? (
             <Link
               href="/settings/connections"
-              className="flex items-center gap-3 rounded-lg px-2 py-1 -mx-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-3 rounded-lg px-2 py-1 -mx-2 transition-colors hover:bg-gray-100"
             >
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-turquoise-100 dark:bg-turquoise-900/30">
-                <Link2 className="h-4 w-4 text-turquoise-600 dark:text-turquoise-400" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white dark:border-gray-900" />
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-turquoise-100">
+                <Link2 className="h-4 w-4 text-turquoise-600" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -47,18 +47,18 @@ export function ChatHeader({ connectionName, onClear, isLoading }: ChatHeaderPro
           ) : (
             <Link
               href="/settings/connections"
-              className="flex items-center gap-3 rounded-lg px-2 py-1 -mx-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-3 rounded-lg px-2 py-1 -mx-2 transition-colors hover:bg-gray-100"
             >
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
-                <Link2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-yellow-500 border-2 border-white dark:border-gray-900" />
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100">
+                <Link2 className="h-4 w-4 text-yellow-600" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-yellow-500 border-2 border-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">No Connection</p>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </div>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                <p className="text-xs text-yellow-600">
                   Click to set up HaloPSA
                 </p>
               </div>

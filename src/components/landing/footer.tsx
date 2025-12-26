@@ -41,7 +41,7 @@ const socialLinks = [
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-gray-200 dark:border-gray-800 bg-background/50">
+    <footer className="border-t border-gray-200 bg-background/50">
       <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-8 lg:grid-cols-6">
           {/* Brand */}
@@ -51,7 +51,7 @@ export function LandingFooter() {
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-bold">
-                <span className="text-turquoise-600 dark:text-turquoise-400">
+                <span className="text-turquoise-600">
                   Halo
                 </span>
                 <span className="text-foreground">PSA AI</span>
@@ -99,7 +99,7 @@ export function LandingFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 border-t border-gray-200 dark:border-gray-800 pt-8">
+        <div className="mt-12 border-t border-gray-200 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} HaloPSA AI. All rights reserved.

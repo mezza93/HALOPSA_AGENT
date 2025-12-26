@@ -58,7 +58,7 @@ export function SettingsProfile({ user }: SettingsProfileProps) {
                   className="h-20 w-20 rounded-full object-cover"
                 />
               ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-600 dark:text-turquoise-400">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 text-turquoise-600">
                   <User className="h-8 w-8" />
                 </div>
               )}
@@ -98,7 +98,7 @@ export function SettingsProfile({ user }: SettingsProfileProps) {
               <input
                 type="email"
                 value={user.email || ''}
-                className="input-field pl-10 bg-gray-50 dark:bg-gray-800"
+                className="input-field pl-10 bg-gray-50"
                 disabled
               />
             </div>
@@ -125,7 +125,7 @@ export function SettingsProfile({ user }: SettingsProfileProps) {
         <h2 className="mb-4 text-lg font-semibold">Account</h2>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
               <p className="font-medium">Change Password</p>
               <p className="text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export function SettingsProfile({ user }: SettingsProfileProps) {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
             <div>
               <p className="font-medium">Two-Factor Authentication</p>
               <p className="text-sm text-muted-foreground">
@@ -149,12 +149,12 @@ export function SettingsProfile({ user }: SettingsProfileProps) {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4">
             <div>
-              <p className="font-medium text-red-600 dark:text-red-400">
+              <p className="font-medium text-red-600">
                 Delete Account
               </p>
-              <p className="text-sm text-red-500 dark:text-red-400/80">
+              <p className="text-sm text-red-500">
                 Permanently delete your account and data
               </p>
             </div>

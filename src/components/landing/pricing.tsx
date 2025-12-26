@@ -69,7 +69,7 @@ export function LandingPricing() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="mb-4 inline-block rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-4 py-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300"
+            className="mb-4 inline-block rounded-full bg-turquoise-100 px-4 py-2 text-sm font-medium text-turquoise-700"
           >
             Pricing
           </motion.span>
@@ -167,14 +167,14 @@ export function LandingPricing() {
           Have questions?{' '}
           <Link
             href="/faq"
-            className="text-turquoise-600 dark:text-turquoise-400 hover:underline"
+            className="text-turquoise-600 hover:underline"
           >
             Check our FAQ
           </Link>{' '}
           or{' '}
           <Link
             href="/contact"
-            className="text-turquoise-600 dark:text-turquoise-400 hover:underline"
+            className="text-turquoise-600 hover:underline"
           >
             contact us
           </Link>

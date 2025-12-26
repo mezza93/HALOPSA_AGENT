@@ -163,14 +163,14 @@ export function ConnectionsManager({ connections: initialConnections }: Connecti
               className="glass-card p-6 flex items-start justify-between"
             >
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100 dark:bg-turquoise-900/30">
-                  <Link2 className="h-6 w-6 text-turquoise-600 dark:text-turquoise-400" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100">
+                  <Link2 className="h-6 w-6 text-turquoise-600" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{connection.name}</h3>
                     {connection.isDefault && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-2 py-0.5 text-xs font-medium text-turquoise-700 dark:text-turquoise-300">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-0.5 text-xs font-medium text-turquoise-700">
                         <Star className="h-3 w-3" />
                         Default
                       </span>
@@ -185,9 +185,9 @@ export function ConnectionsManager({ connections: initialConnections }: Connecti
                       <span
                         className={
                           connection.testStatus === 'SUCCESS'
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-green-600'
                             : connection.testStatus === 'FAILED'
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-red-600'
                             : 'text-muted-foreground'
                         }
                       >
@@ -230,7 +230,7 @@ export function ConnectionsManager({ connections: initialConnections }: Connecti
                   size="sm"
                   onClick={() => handleDeleteConnection(connection.id)}
                   disabled={deletingId === connection.id}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
                 >
                   {deletingId === connection.id ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -100,7 +100,7 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-800 bg-background/80 backdrop-blur-lg p-4">
+    <div className="border-t border-gray-200 bg-background/80 backdrop-blur-lg p-4">
       <div className="mx-auto max-w-3xl">
         {/* Attachments preview */}
         {attachments.length > 0 && (
@@ -108,7 +108,7 @@ export function ChatInput({
             {attachments.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-2 text-sm"
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm"
               >
                 {file.type.startsWith('image/') ? (
                   <img
@@ -127,7 +127,7 @@ export function ChatInput({
                 </div>
                 <button
                   onClick={() => removeAttachment(index)}
-                  className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="rounded-full p-1 hover:bg-gray-200"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -143,18 +143,18 @@ export function ChatInput({
             className={cn(
               'relative rounded-2xl border transition-all',
               isDragActive
-                ? 'border-turquoise-500 bg-turquoise-50 dark:bg-turquoise-900/20'
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+                ? 'border-turquoise-500 bg-turquoise-50'
+                : 'border-gray-200 bg-white'
             )}
           >
             <input {...getInputProps()} />
 
             {/* Drag overlay */}
             {isDragActive && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-turquoise-50/90 dark:bg-turquoise-900/90 z-10">
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-turquoise-50/90 z-10">
                 <div className="text-center">
                   <Paperclip className="mx-auto h-8 w-8 text-turquoise-500" />
-                  <p className="mt-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300">
+                  <p className="mt-2 text-sm font-medium text-turquoise-700">
                     Drop files here
                   </p>
                 </div>

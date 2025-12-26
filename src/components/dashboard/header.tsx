@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Bell, Search, Moon, Sun, Sparkles } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Menu, X, Bell, Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 
@@ -20,7 +19,6 @@ interface HeaderProps {
 export function DashboardHeader({ user }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
 
   // Get page title from pathname
   const getPageTitle = () => {
@@ -33,13 +31,13 @@ export function DashboardHeader({ user }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-gray-200 dark:border-gray-800 bg-background/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-30 border-b border-gray-200 bg-background/80 backdrop-blur-lg">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6">
         {/* Mobile menu button */}
         <div className="flex items-center gap-4 lg:hidden">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="rounded-lg p-2 hover:bg-gray-100"
           >
             {mobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -66,17 +64,6 @@ export function DashboardHeader({ user }: HeaderProps) {
             <Search className="h-5 w-5" />
           </Button>
 
-          {/* Theme toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
@@ -88,7 +75,7 @@ export function DashboardHeader({ user }: HeaderProps) {
       {/* Mobile menu */}
       <div
         className={cn(
-          'lg:hidden border-t border-gray-200 dark:border-gray-800 bg-background',
+          'lg:hidden border-t border-gray-200 bg-background',
           mobileMenuOpen ? 'block' : 'hidden'
         )}
       >
@@ -106,8 +93,8 @@ export function DashboardHeader({ user }: HeaderProps) {
               className={cn(
                 'block rounded-xl px-4 py-3 text-sm font-medium transition-all',
                 pathname === item.href
-                  ? 'bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-700 dark:text-turquoise-300'
-                  : 'text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-turquoise-100 text-turquoise-700'
+                  : 'text-muted-foreground hover:bg-gray-100'
               )}
             >
               {item.name}

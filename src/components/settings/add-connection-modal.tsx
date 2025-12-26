@@ -115,7 +115,7 @@ export function AddConnectionModal({
           <h2 className="text-xl font-bold">Add Connection</h2>
           <button
             onClick={handleClose}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="rounded-lg p-2 hover:bg-gray-100"
           >
             <X className="h-5 w-5" />
           </button>
@@ -190,14 +190,14 @@ export function AddConnectionModal({
 
           {/* Test status */}
           {testStatus === 'success' && (
-            <div className="flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-300">
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
               <CheckCircle className="h-5 w-5" />
               Connection test successful
             </div>
           )}
 
           {testStatus === 'error' && (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-300">
+            <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
               Connection test failed. Please check your credentials.
             </div>
           )}

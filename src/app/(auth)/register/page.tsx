@@ -123,7 +123,7 @@ export default function RegisterPage() {
       {/* Divider */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+          <div className="w-full border-t border-gray-200" />
         </div>
         <div className="relative flex justify-center text-sm">
           <span className="bg-background px-4 text-muted-foreground">
@@ -219,11 +219,11 @@ export default function RegisterPage() {
       {/* Terms */}
       <p className="text-center text-xs text-muted-foreground">
         By creating an account, you agree to our{' '}
-        <Link href="/terms" className="text-turquoise-600 dark:text-turquoise-400 hover:underline">
+        <Link href="/terms" className="text-turquoise-600 hover:underline">
           Terms of Service
         </Link>{' '}
         and{' '}
-        <Link href="/privacy" className="text-turquoise-600 dark:text-turquoise-400 hover:underline">
+        <Link href="/privacy" className="text-turquoise-600 hover:underline">
           Privacy Policy
         </Link>
       </p>
@@ -233,7 +233,7 @@ export default function RegisterPage() {
         Already have an account?{' '}
         <Link
           href="/login"
-          className="text-turquoise-600 dark:text-turquoise-400 hover:underline"
+          className="text-turquoise-600 hover:underline"
         >
           Sign in
         </Link>

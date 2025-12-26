@@ -26,7 +26,7 @@ export function LandingDemo() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="mb-4 inline-block rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-4 py-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300"
+            className="mb-4 inline-block rounded-full bg-turquoise-100 px-4 py-2 text-sm font-medium text-turquoise-700"
           >
             See it in action
           </motion.span>
@@ -124,7 +124,7 @@ export function LandingDemo() {
                 className={`rounded-full px-4 py-2 text-sm transition-all ${
                   activeQuery === index
                     ? 'bg-turquoise-500 text-white shadow-glow-sm'
-                    : 'bg-white dark:bg-gray-800 text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-700'
+                    : 'bg-white text-muted-foreground hover:bg-gray-100'
                 }`}
               >
                 "{query}"

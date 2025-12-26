@@ -37,7 +37,7 @@ export function LandingTestimonials() {
   return (
     <section id="testimonials" className="relative py-24 sm:py-32">
       {/* Background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-turquoise-50/20 dark:via-turquoise-950/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-turquoise-50/20 to-transparent" />
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section header */}
@@ -46,7 +46,7 @@ export function LandingTestimonials() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="mb-4 inline-block rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-4 py-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300"
+            className="mb-4 inline-block rounded-full bg-turquoise-100 px-4 py-2 text-sm font-medium text-turquoise-700"
           >
             Testimonials
           </motion.span>
@@ -83,7 +83,7 @@ export function LandingTestimonials() {
               className="glass-card relative p-6"
             >
               {/* Quote icon */}
-              <Quote className="absolute top-4 right-4 h-8 w-8 text-turquoise-200 dark:text-turquoise-800" />
+              <Quote className="absolute top-4 right-4 h-8 w-8 text-turquoise-200" />
 
               {/* Stars */}
               <div className="mb-4 flex gap-1">
@@ -100,7 +100,7 @@ export function LandingTestimonials() {
 
               {/* Author */}
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-600 dark:text-turquoise-400 font-semibold">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-turquoise-100 text-turquoise-600 font-semibold">
                   {testimonial.avatar}
                 </div>
                 <div>

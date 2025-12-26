@@ -95,7 +95,7 @@ export function LandingFeatures() {
   return (
     <section id="features" className="relative py-24 sm:py-32">
       {/* Background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-turquoise-50/30 dark:via-turquoise-950/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-turquoise-50/30 to-transparent" />
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section header */}
@@ -104,7 +104,7 @@ export function LandingFeatures() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="mb-4 inline-block rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-4 py-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300"
+            className="mb-4 inline-block rounded-full bg-turquoise-100 px-4 py-2 text-sm font-medium text-turquoise-700"
           >
             Features
           </motion.span>
@@ -144,7 +144,7 @@ export function LandingFeatures() {
               variants={itemVariants}
               className="glass-card group p-6 transition-all duration-300 hover:shadow-glow-sm"
             >
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-600 dark:text-turquoise-400 transition-all group-hover:scale-110 group-hover:shadow-glow-sm">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100 text-turquoise-600 transition-all group-hover:scale-110 group-hover:shadow-glow-sm">
                 <feature.icon className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>

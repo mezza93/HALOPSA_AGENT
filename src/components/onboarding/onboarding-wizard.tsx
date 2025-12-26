@@ -118,7 +118,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                     ? 'border-turquoise-500 bg-turquoise-500 text-white'
                     : index === currentStepIndex
                     ? 'border-turquoise-500 text-turquoise-500'
-                    : 'border-gray-300 dark:border-gray-600 text-gray-400'
+                    : 'border-gray-300 text-gray-400'
                 }`}
               >
                 {index < currentStepIndex ? (
@@ -132,7 +132,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                   className={`h-1 w-16 sm:w-24 mx-2 rounded ${
                     index < currentStepIndex
                       ? 'bg-turquoise-500'
-                      : 'bg-gray-200 dark:bg-gray-700'
+                      : 'bg-gray-200'
                   }`}
                 />
               )}
@@ -161,7 +161,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
           {/* Welcome Step */}
           {currentStep === 'welcome' && (
             <div className="text-center">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100">
                 <Sparkles className="h-10 w-10 text-turquoise-500" />
               </div>
               <h1 className="mb-2 text-2xl font-bold">
@@ -173,7 +173,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                 more with natural language.
               </p>
               <div className="space-y-3 text-left">
-                <div className="flex items-start gap-3 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3">
                   <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-turquoise-500" />
                   <div>
                     <p className="font-medium">Quick Setup</p>
@@ -182,7 +182,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3">
                   <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-turquoise-500" />
                   <div>
                     <p className="font-medium">Secure Connection</p>
@@ -191,7 +191,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3">
                   <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-turquoise-500" />
                   <div>
                     <p className="font-medium">Read-Only by Default</p>
@@ -216,7 +216,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
           {currentStep === 'connect' && (
             <div>
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100 dark:bg-turquoise-900/30">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100">
                   <Link2 className="h-6 w-6 text-turquoise-500" />
                 </div>
                 <div>
@@ -227,8 +227,8 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                 </div>
               </div>
 
-              <div className="mb-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+              <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-4">
+                <p className="text-sm text-blue-700">
                   <strong>Need help?</strong> Follow our{' '}
                   <a
                     href="/docs/halopsa-setup"
@@ -344,7 +344,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
               <div className="mb-6">
                 {testStatus === 'idle' && (
                   <>
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
                       <Link2 className="h-10 w-10 text-gray-400" />
                     </div>
                     <h2 className="text-xl font-bold">Test Your Connection</h2>
@@ -356,7 +356,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
 
                 {testStatus === 'testing' && (
                   <>
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30">
+                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100">
                       <Loader2 className="h-10 w-10 animate-spin text-turquoise-500" />
                     </div>
                     <h2 className="text-xl font-bold">Testing Connection...</h2>
@@ -368,7 +368,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
 
                 {testStatus === 'success' && (
                   <>
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
                       <CheckCircle className="h-10 w-10 text-green-500" />
                     </div>
                     <h2 className="text-xl font-bold">Connection Successful!</h2>
@@ -380,7 +380,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
 
                 {testStatus === 'error' && (
                   <>
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
                       <span className="text-3xl">❌</span>
                     </div>
                     <h2 className="text-xl font-bold">Connection Failed</h2>
@@ -391,7 +391,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                 )}
               </div>
 
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 text-left">
+              <div className="rounded-lg bg-gray-50 p-4 text-left">
                 <p className="text-sm font-medium">Connection Details</p>
                 <dl className="mt-2 space-y-1 text-sm">
                   <div className="flex justify-between">
@@ -456,7 +456,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
           {/* Complete Step */}
           {currentStep === 'complete' && (
             <div className="text-center">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100 dark:bg-turquoise-900/30">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-turquoise-100">
                 <Sparkles className="h-10 w-10 text-turquoise-500" />
               </div>
               <h2 className="mb-2 text-2xl font-bold">You're All Set!</h2>
@@ -475,7 +475,7 @@ export function OnboardingWizard({ userId, userName }: OnboardingWizardProps) {
                   ].map((query, index) => (
                     <div
                       key={index}
-                      className="rounded-lg bg-gray-50 dark:bg-gray-800 px-4 py-2 text-sm"
+                      className="rounded-lg bg-gray-50 px-4 py-2 text-sm"
                     >
                       "{query}"
                     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   BookOpen,
@@ -19,6 +19,7 @@ import {
   Lightbulb,
   ChevronRight,
   Search,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -31,7 +32,7 @@ interface KnowledgeBaseItem {
   summary: string | null;
   sourceId: string | null;
   sourceName: string | null;
-  updatedAt: Date;
+  updatedAt: string;
 }
 
 interface SyncStatus {
@@ -42,7 +43,7 @@ interface SyncStatus {
   itemsUpdated: number;
   itemsRemoved: number;
   errorCount: number;
-  syncedAt: Date;
+  syncedAt: string;
 }
 
 interface KnowledgeBaseViewProps {
@@ -75,10 +76,43 @@ const categoryLabels: Record<string, string> = {
   BEST_PRACTICES: 'Best Practices',
 };
 
+const syncSteps = [
+  'Connecting to HaloPSA...',
+  'Syncing ticket types...',
+  'Syncing statuses & priorities...',
+  'Syncing categories...',
+  'Syncing custom fields...',
+  'Syncing workflows...',
+  'Syncing templates...',
+  'Syncing clients...',
+  'Syncing agents & teams...',
+  'Finalizing...',
+];
+
 export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseViewProps) {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [syncStep, setSyncStep] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Simulate progress during sync
+  useEffect(() => {
+    if (isSyncing) {
+      const interval = setInterval(() => {
+        setSyncProgress((prev) => {
+          const next = Math.min(prev + Math.random() * 15, 95);
+          const stepIndex = Math.floor((next / 100) * syncSteps.length);
+          setSyncStep(syncSteps[Math.min(stepIndex, syncSteps.length - 1)]);
+          return next;
+        });
+      }, 800);
+      return () => clearInterval(interval);
+    } else {
+      setSyncProgress(0);
+      setSyncStep('');
+    }
+  }, [isSyncing]);
 
   // Group items by category
   const itemsByCategory = items.reduce((acc, item) => {
@@ -95,24 +129,37 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
   // Handle sync
   const handleSync = async () => {
     setIsSyncing(true);
+    setSyncProgress(5);
+    setSyncStep(syncSteps[0]);
+
     try {
       const response = await fetch('/api/knowledge-base/sync', {
         method: 'POST',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Sync failed');
+      // Handle non-JSON responses
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(text || 'Server returned an invalid response');
       }
 
       const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Sync failed');
+      }
+
+      setSyncProgress(100);
+      setSyncStep('Complete!');
+
       toast.success(`Synced ${result.itemsAdded} new items, updated ${result.itemsUpdated}`);
 
-      // Reload page to show new data
-      window.location.reload();
+      // Reload page to show new data after brief delay
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
+      console.error('Sync error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sync knowledge base');
-    } finally {
       setIsSyncing(false);
     }
   };
@@ -129,29 +176,50 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <div className="w-72 border-r border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-col">
+      <div className="w-72 border-r border-gray-200 bg-gray-50/50 flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="h-5 w-5 text-turquoise-600" />
             <h1 className="text-lg font-semibold">Knowledge Base</h1>
           </div>
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className={cn(
-              'w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all',
-              'bg-turquoise-500 hover:bg-turquoise-600 text-white',
-              isSyncing && 'opacity-50 cursor-not-allowed'
+
+          {/* Sync button with progress */}
+          <div className="space-y-2">
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all',
+                'bg-turquoise-500 hover:bg-turquoise-600 text-white',
+                isSyncing && 'cursor-not-allowed'
+              )}
+            >
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isSyncing ? 'Syncing...' : 'Sync from HaloPSA'}
+            </button>
+
+            {/* Progress bar */}
+            {isSyncing && (
+              <div className="space-y-1.5">
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-turquoise-500 transition-all duration-300 ease-out"
+                    style={{ width: `${syncProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 text-center">{syncStep}</p>
+              </div>
             )}
-          >
-            <RefreshCw className={cn('h-4 w-4', isSyncing && 'animate-spin')} />
-            {isSyncing ? 'Syncing...' : 'Sync from HaloPSA'}
-          </button>
+          </div>
 
           {/* Sync status */}
-          {syncStatus && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          {syncStatus && !isSyncing && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
               {syncStatus.status === 'COMPLETED' ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
               ) : syncStatus.status === 'FAILED' ? (
@@ -181,8 +249,8 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
                 className={cn(
                   'w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-all',
                   isActive
-                    ? 'bg-turquoise-100 dark:bg-turquoise-900/30 text-turquoise-700 dark:text-turquoise-300'
-                    : 'text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-foreground'
+                    ? 'bg-turquoise-100 text-turquoise-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -193,8 +261,8 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
                   <span className={cn(
                     'text-xs px-1.5 py-0.5 rounded',
                     count > 0
-                      ? 'bg-turquoise-100 dark:bg-turquoise-900/50 text-turquoise-700 dark:text-turquoise-300'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                      ? 'bg-turquoise-100 text-turquoise-700'
+                      : 'bg-gray-100 text-gray-500'
                   )}>
                     {count}
                   </span>
@@ -206,33 +274,33 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
         </nav>
 
         {/* Stats */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-          <div className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{items.length}</span> total items synced
+        <div className="p-4 border-t border-gray-200">
+          <div className="text-xs text-gray-500">
+            <span className="font-medium text-gray-900">{items.length}</span> total items synced
           </div>
         </div>
       </div>
 
       {/* Content area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white">
         {selectedCategory ? (
           <>
             {/* Category header */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold">{categoryLabels[selectedCategory]}</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 {filteredItems.length} items in this category
               </p>
 
               {/* Search */}
               <div className="mt-3 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500"
                 />
               </div>
             </div>
@@ -244,36 +312,36 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
                   {filteredItems.map((item) => (
                     <div
                       key={item.id}
-                      className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-turquoise-300 dark:hover:border-turquoise-700 transition-colors"
+                      className="p-4 rounded-xl border border-gray-200 bg-white hover:border-turquoise-300 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="font-medium">{item.title}</h3>
                           {item.subcategory && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-gray-500">
                               {item.subcategory}
                             </span>
                           )}
                         </div>
                         {item.sourceId && (
-                          <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                          <span className="text-xs bg-gray-100 px-2 py-1 rounded">
                             ID: {item.sourceId}
                           </span>
                         )}
                       </div>
                       {item.summary && (
-                        <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                        <p className="mt-2 text-sm text-gray-500 line-clamp-2">
                           {item.summary}
                         </p>
                       )}
-                      <div className="mt-3 text-xs text-muted-foreground">
+                      <div className="mt-3 text-xs text-gray-400">
                         Updated: {new Date(item.updatedAt).toLocaleDateString()}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>No items in this category</p>
                   <p className="text-sm mt-1">Click "Sync from HaloPSA" to populate</p>
@@ -287,7 +355,7 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
             <div className="text-center max-w-md px-6">
               <BookOpen className="h-16 w-16 mx-auto mb-4 text-turquoise-500/50" />
               <h2 className="text-xl font-semibold mb-2">Your AI Knowledge Base</h2>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-gray-500 mb-6">
                 Sync your HaloPSA configuration to help the AI assistant understand your setup.
                 This includes ticket types, priorities, categories, workflows, and more.
               </p>
@@ -301,11 +369,15 @@ export function KnowledgeBaseView({ items, syncStatus, userId }: KnowledgeBaseVi
                     isSyncing && 'opacity-50 cursor-not-allowed'
                   )}
                 >
-                  <RefreshCw className={cn('h-4 w-4', isSyncing && 'animate-spin')} />
+                  {isSyncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
                   {isSyncing ? 'Syncing...' : 'Start Initial Sync'}
                 </button>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-gray-500">
                   Select a category from the sidebar to view items
                 </p>
               )}

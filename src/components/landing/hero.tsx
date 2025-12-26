@@ -20,7 +20,7 @@ export function LandingHero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8 inline-flex items-center gap-2 rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-4 py-2 text-sm font-medium text-turquoise-700 dark:text-turquoise-300"
+            className="mb-8 inline-flex items-center gap-2 rounded-full bg-turquoise-100 px-4 py-2 text-sm font-medium text-turquoise-700"
           >
             <Sparkles className="h-4 w-4" />
             Powered by Claude AI
@@ -83,7 +83,7 @@ export function LandingHero() {
               { value: '24/7', label: 'AI Availability' },
             ].map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-3xl font-bold text-turquoise-600 dark:text-turquoise-400 sm:text-4xl">
+                <div className="text-3xl font-bold text-turquoise-600 sm:text-4xl">
                   {stat.value}
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">
@@ -103,13 +103,13 @@ export function LandingHero() {
         >
           <div className="glass-card overflow-hidden p-1">
             {/* Browser chrome */}
-            <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
               <div className="flex gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-red-400" />
                 <div className="h-3 w-3 rounded-full bg-yellow-400" />
                 <div className="h-3 w-3 rounded-full bg-green-400" />
               </div>
-              <div className="ml-4 flex-1 rounded-lg bg-gray-100 dark:bg-gray-800 px-4 py-1.5 text-sm text-muted-foreground">
+              <div className="ml-4 flex-1 rounded-lg bg-gray-100 px-4 py-1.5 text-sm text-muted-foreground">
                 halopsa.ai/chat
               </div>
             </div>
@@ -128,7 +128,7 @@ export function LandingHero() {
                 {/* AI response */}
                 <div className="flex justify-start">
                   <div className="chat-message-assistant max-w-2xl">
-                    <div className="mb-3 flex items-center gap-2 text-sm text-turquoise-600 dark:text-turquoise-400">
+                    <div className="mb-3 flex items-center gap-2 text-sm text-turquoise-600">
                       <Sparkles className="h-4 w-4" />
                       Querying HaloPSA...
                     </div>
@@ -136,9 +136,9 @@ export function LandingHero() {
                       Found <strong>12 high-priority tickets</strong> for the
                       Network Team:
                     </p>
-                    <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="overflow-hidden rounded-lg border border-gray-200">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-800">
+                        <thead className="bg-gray-50">
                           <tr>
                             <th className="px-3 py-2 text-left font-medium">
                               ID
@@ -155,13 +155,13 @@ export function LandingHero() {
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="border-t border-gray-200 dark:border-gray-700">
-                            <td className="px-3 py-2 text-turquoise-600 dark:text-turquoise-400">
+                          <tr className="border-t border-gray-200">
+                            <td className="px-3 py-2 text-turquoise-600">
                               #4521
                             </td>
                             <td className="px-3 py-2">Core switch failure</td>
                             <td className="px-3 py-2">
-                              <span className="rounded bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs text-red-700 dark:text-red-400">
+                              <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
                                 P1
                               </span>
                             </td>
@@ -169,13 +169,13 @@ export function LandingHero() {
                               Breached
                             </td>
                           </tr>
-                          <tr className="border-t border-gray-200 dark:border-gray-700">
-                            <td className="px-3 py-2 text-turquoise-600 dark:text-turquoise-400">
+                          <tr className="border-t border-gray-200">
+                            <td className="px-3 py-2 text-turquoise-600">
                               #4518
                             </td>
                             <td className="px-3 py-2">VPN connectivity issues</td>
                             <td className="px-3 py-2">
-                              <span className="rounded bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs text-orange-700 dark:text-orange-400">
+                              <span className="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
                                 P2
                               </span>
                             </td>
@@ -207,7 +207,7 @@ export function LandingHero() {
           ].map((feature, index) => (
             <div
               key={index}
-              className="flex items-center gap-2 rounded-full bg-white/50 dark:bg-gray-800/50 px-4 py-2 text-sm"
+              className="flex items-center gap-2 rounded-full bg-white/50 px-4 py-2 text-sm"
             >
               <feature.icon className="h-4 w-4 text-turquoise-500" />
               {feature.label}

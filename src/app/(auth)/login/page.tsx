@@ -97,7 +97,7 @@ function LoginForm() {
       {/* Divider */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+          <div className="w-full border-t border-gray-200" />
         </div>
         <div className="relative flex justify-center text-sm">
           <span className="bg-background px-4 text-muted-foreground">
@@ -134,7 +134,7 @@ function LoginForm() {
             </label>
             <Link
               href="/forgot-password"
-              className="text-sm text-turquoise-600 dark:text-turquoise-400 hover:underline"
+              className="text-sm text-turquoise-600 hover:underline"
             >
               Forgot password?
             </Link>
@@ -164,7 +164,7 @@ function LoginForm() {
         Don't have an account?{' '}
         <Link
           href="/register"
-          className="text-turquoise-600 dark:text-turquoise-400 hover:underline"
+          className="text-turquoise-600 hover:underline"
         >
           Sign up for free
         </Link>

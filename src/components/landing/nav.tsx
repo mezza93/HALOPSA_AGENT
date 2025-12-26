@@ -26,7 +26,7 @@ export function LandingNav() {
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold">
-              <span className="text-turquoise-600 dark:text-turquoise-400">Halo</span>
+              <span className="text-turquoise-600">Halo</span>
               <span className="text-foreground">PSA AI</span>
             </span>
           </Link>
@@ -61,7 +61,7 @@ export function LandingNav() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 md:hidden"
+            className="rounded-lg p-2 hover:bg-gray-100 md:hidden"
             aria-label="Toggle menu"
           >
             {isOpen ? (

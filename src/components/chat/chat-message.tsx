@@ -40,12 +40,12 @@ export const ChatMessage = memo(function ChatMessage({
         className={cn(
           'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full',
           isUser
-            ? 'bg-gray-200 dark:bg-gray-700'
+            ? 'bg-gray-200'
             : 'bg-turquoise-500'
         )}
       >
         {isUser ? (
-          <User className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+          <User className="h-5 w-5 text-gray-600" />
         ) : (
           <Sparkles className="h-5 w-5 text-white" />
         )}
@@ -63,13 +63,13 @@ export const ChatMessage = memo(function ChatMessage({
             'inline-block max-w-full rounded-2xl px-4 py-3',
             isUser
               ? 'bg-turquoise-500 text-white rounded-tr-md'
-              : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-tl-md'
+              : 'bg-white border border-gray-200 rounded-tl-md'
           )}
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <div className="prose-turquoise prose prose-sm max-w-none dark:prose-invert">
+            <div className="prose-turquoise prose prose-sm max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -106,7 +106,7 @@ export const ChatMessage = memo(function ChatMessage({
 
                     return (
                       <code
-                        className="rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-turquoise-600 dark:text-turquoise-400"
+                        className="rounded bg-gray-100 px-1.5 py-0.5 text-turquoise-600"
                         {...props}
                       >
                         {children}
@@ -116,7 +116,7 @@ export const ChatMessage = memo(function ChatMessage({
                   table({ children }) {
                     return (
                       <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border border-gray-200 dark:border-gray-700">
+                        <table className="w-full border-collapse border border-gray-200">
                           {children}
                         </table>
                       </div>
@@ -124,14 +124,14 @@ export const ChatMessage = memo(function ChatMessage({
                   },
                   th({ children }) {
                     return (
-                      <th className="border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left font-semibold">
+                      <th className="border border-gray-200 bg-gray-50 px-3 py-2 text-left font-semibold">
                         {children}
                       </th>
                     );
                   },
                   td({ children }) {
                     return (
-                      <td className="border border-gray-200 dark:border-gray-700 px-3 py-2">
+                      <td className="border border-gray-200 px-3 py-2">
                         {children}
                       </td>
                     );
@@ -142,7 +142,7 @@ export const ChatMessage = memo(function ChatMessage({
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-turquoise-600 dark:text-turquoise-400 hover:underline"
+                        className="text-turquoise-600 hover:underline"
                       >
                         {children}
                       </a>
@@ -162,7 +162,7 @@ export const ChatMessage = memo(function ChatMessage({
             {message.toolInvocations.map((tool, index) => (
               <span
                 key={index}
-                className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 dark:bg-turquoise-900/30 px-2 py-1 text-xs text-turquoise-700 dark:text-turquoise-300"
+                className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-1 text-xs text-turquoise-700"
               >
                 <Sparkles className="h-3 w-3" />
                 {tool.toolName}

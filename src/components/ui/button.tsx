@@ -14,12 +14,12 @@ const buttonVariants = cva(
         destructive:
           'bg-red-500 text-white shadow-md hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/25 active:scale-[0.98]',
         outline:
-          'border border-turquoise-200 dark:border-turquoise-800 bg-white dark:bg-gray-900 text-turquoise-600 dark:text-turquoise-400 hover:bg-turquoise-50 dark:hover:bg-turquoise-900/20 active:scale-[0.98]',
+          'border border-turquoise-200 bg-white text-turquoise-600 hover:bg-turquoise-50 active:scale-[0.98]',
         secondary:
-          'bg-gray-100 dark:bg-gray-800 text-foreground hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98]',
+          'bg-gray-100 text-foreground hover:bg-gray-200 active:scale-[0.98]',
         ghost:
-          'text-foreground hover:bg-gray-100 dark:hover:bg-gray-800',
-        link: 'text-turquoise-600 dark:text-turquoise-400 underline-offset-4 hover:underline',
+          'text-foreground hover:bg-gray-100',
+        link: 'text-turquoise-600 underline-offset-4 hover:underline',
         success:
           'bg-green-500 text-white shadow-md hover:bg-green-600 hover:shadow-lg hover:shadow-green-500/25 active:scale-[0.98]',
       },
