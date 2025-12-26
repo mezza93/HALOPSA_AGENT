@@ -406,29 +406,22 @@ export function createReportTools(ctx: HaloContext) {
       parameters: z.object({
         name: z.string().describe('Dashboard name'),
         description: z.string().optional().describe('Dashboard description'),
-        isShared: z.boolean().optional().default(true).describe('Whether to share with other users'),
       }),
-      execute: async ({ name, description, isShared }) => {
+      execute: async ({ name, description }) => {
         try {
           console.log(`[Tool:createDashboard] Creating dashboard: ${name}`);
-          const dashboardData: Record<string, unknown> = {
+          const dashboard = await ctx.reports.dashboards.createDashboard({
             name,
-            isShared: isShared !== false,
+            description,
+          });
+
+          console.log(`[Tool:createDashboard] Successfully created dashboard ID: ${dashboard.id}`);
+          return {
+            success: true,
+            dashboardId: dashboard.id,
+            name: dashboard.name,
+            message: `Dashboard '${dashboard.name}' created successfully`,
           };
-
-          if (description) dashboardData.description = description;
-
-          const dashboards = await ctx.reports.dashboards.create([dashboardData]);
-          if (dashboards && dashboards.length > 0) {
-            console.log(`[Tool:createDashboard] Successfully created dashboard ID: ${dashboards[0].id}`);
-            return {
-              success: true,
-              dashboardId: dashboards[0].id,
-              name: dashboards[0].name,
-              message: `Dashboard '${dashboards[0].name}' created successfully`,
-            };
-          }
-          return { success: false, error: 'Failed to create dashboard - no response from HaloPSA' };
         } catch (error) {
           return formatError(error, 'createDashboard');
         }
@@ -436,26 +429,43 @@ export function createReportTools(ctx: HaloContext) {
     }),
 
     addDashboardWidget: tool({
-      description: 'Add a widget to a dashboard.',
+      description: `Add a widget to a dashboard. Widget types:
+- 'bar' or 'chart': Bar chart (requires reportId)
+- 'pie': Pie/donut chart (requires reportId)
+- 'counter_report': Counter based on report (requires reportId)
+- 'list': List widget (requires filterId)
+- 'counter': Counter based on filter (requires filterId and ticketAreaId)`,
       parameters: z.object({
         dashboardId: z.number().describe('The dashboard ID'),
-        name: z.string().describe('Widget name/title'),
-        widgetType: z.enum(['chart', 'bar', 'pie', 'line', 'counter', 'counter_report', 'table', 'list']).describe('Type of widget'),
-        reportId: z.number().optional().describe('Report ID (required for chart types)'),
-        filterId: z.number().optional().describe('Filter ID (required for counter/list types)'),
-        ticketAreaId: z.number().optional().describe('Ticket area ID (for counter widgets)'),
+        title: z.string().describe('Widget title'),
+        widgetType: z.enum(['chart', 'bar', 'pie', 'counter_report', 'list', 'counter']).describe('Type of widget'),
+        reportId: z.number().optional().describe('Report ID (required for bar, pie, counter_report types)'),
+        filterId: z.number().optional().describe('Filter ID (required for list, counter types)'),
+        ticketAreaId: z.number().optional().describe('Ticket area ID (required for counter type). Common values: 1=Tickets, 2=Projects'),
         width: z.number().optional().default(4).describe('Widget width (1-12)'),
         height: z.number().optional().default(2).describe('Widget height'),
         positionX: z.number().optional().default(0).describe('X position on grid'),
         positionY: z.number().optional().default(0).describe('Y position on grid'),
         colour: z.string().optional().describe('Widget color (hex code)'),
       }),
-      execute: async ({ dashboardId, name, widgetType, reportId, filterId, ticketAreaId, width, height, positionX, positionY, colour }) => {
+      execute: async ({ dashboardId, title, widgetType, reportId, filterId, ticketAreaId, width, height, positionX, positionY, colour }) => {
         try {
-          console.log(`[Tool:addDashboardWidget] Adding widget '${name}' to dashboard ${dashboardId}`);
-          const widget = await ctx.reports.dashboards.addWidget(dashboardId, {
-            name,
-            widgetType,
+          // Convert string widget type to numeric type for HaloPSA API
+          const widgetTypeMap: Record<string, number> = {
+            'chart': 0,      // Bar chart
+            'bar': 0,        // Bar chart
+            'pie': 1,        // Pie/donut chart
+            'counter_report': 2,  // Counter based on report
+            'list': 6,       // List widget
+            'counter': 7,    // Counter based on filter
+          };
+          const numericWidgetType = widgetTypeMap[widgetType] ?? 0;
+
+          console.log(`[Tool:addDashboardWidget] Adding widget '${title}' (type ${numericWidgetType}) to dashboard ${dashboardId}`);
+
+          const updatedDashboard = await ctx.reports.dashboards.addWidget(dashboardId, {
+            title,
+            widgetType: numericWidgetType,
             reportId,
             filterId,
             ticketAreaId,
@@ -466,12 +476,12 @@ export function createReportTools(ctx: HaloContext) {
             colour,
           });
 
-          console.log(`[Tool:addDashboardWidget] Successfully added widget ID: ${widget.id}`);
+          console.log(`[Tool:addDashboardWidget] Successfully added widget to dashboard ${updatedDashboard.id}`);
           return {
             success: true,
-            widgetId: widget.id,
-            dashboardId,
-            message: `Widget '${name}' added to dashboard`,
+            dashboardId: updatedDashboard.id,
+            widgetCount: updatedDashboard.widgets?.length || 0,
+            message: `Widget '${title}' added to dashboard`,
           };
         } catch (error) {
           return formatError(error, 'addDashboardWidget');
