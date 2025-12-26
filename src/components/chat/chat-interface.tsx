@@ -113,6 +113,7 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
       <ChatHeader
         connectionName={activeConnection?.name}
         onClear={() => window.location.reload()}
+        isLoading={isLoading}
       />
 
       {/* Messages area */}
