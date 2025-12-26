@@ -291,7 +291,7 @@ export async function POST(req: Request) {
     let result;
     try {
       result = streamText({
-        model: anthropic('claude-opus-4-5-20251101'),
+        model: anthropic('claude-sonnet-4-20250514'),
         system: SYSTEM_PROMPT + connectionContext,
         messages,
         tools: Object.keys(tools).length > 0 ? tools : undefined,
@@ -358,6 +358,15 @@ export async function POST(req: Request) {
       });
     } catch (streamError) {
       console.error('[Chat API] Stream creation error:', streamError);
+      // Log full error details
+      if (streamError instanceof Error) {
+        console.error('[Chat API] Error name:', streamError.name);
+        console.error('[Chat API] Error message:', streamError.message);
+        console.error('[Chat API] Error stack:', streamError.stack);
+        if ('cause' in streamError) {
+          console.error('[Chat API] Error cause:', streamError.cause);
+        }
+      }
       const errorMessage = streamError instanceof Error ? streamError.message : 'Unknown streaming error';
 
       // Check for specific Anthropic API errors
