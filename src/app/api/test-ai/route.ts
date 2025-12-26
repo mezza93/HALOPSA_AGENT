@@ -1,10 +1,11 @@
 /**
  * Simple AI test endpoint to diagnose issues.
  * GET /api/test-ai - Tests the Anthropic API connection
+ * POST /api/test-ai - Tests streaming like the chat endpoint
  */
 
 import { anthropic } from '@ai-sdk/anthropic';
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 
 export async function GET() {
   const checks: Record<string, unknown> = {
@@ -46,21 +47,32 @@ export async function GET() {
       errorDetails.cause = String(error.cause);
     }
 
-    // Check for specific error types
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('unauthorized')) {
-        errorDetails.hint = 'API key is invalid or expired';
-      } else if (error.message.includes('model')) {
-        errorDetails.hint = 'Model ID may be incorrect';
-      } else if (error.message.includes('rate')) {
-        errorDetails.hint = 'Rate limited - wait and try again';
-      }
-    }
-
     return Response.json({
       ...checks,
       status: 'error',
       error: errorDetails,
+    }, { status: 500 });
+  }
+}
+
+// Test streaming like the chat endpoint does
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { message = 'Say hello' } = body;
+
+    const result = streamText({
+      model: anthropic('claude-sonnet-4-20250514'),
+      system: 'You are a helpful assistant. Be brief.',
+      messages: [{ role: 'user', content: message }],
+    });
+
+    return result.toDataStreamResponse();
+  } catch (error) {
+    console.error('Test streaming error:', error);
+    return Response.json({
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error),
     }, { status: 500 });
   }
 }
