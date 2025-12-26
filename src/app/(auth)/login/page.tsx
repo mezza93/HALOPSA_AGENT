@@ -28,7 +28,10 @@ function LoginForm() {
         redirect: false,
       });
 
+      console.log('Sign in result:', result);
+
       if (result?.error) {
+        console.error('Sign in error:', result.error);
         toast.error(result.error === 'CredentialsSignin'
           ? 'Invalid email or password'
           : result.error);
@@ -37,15 +40,18 @@ function LoginForm() {
       }
 
       if (result?.ok) {
-        // Refresh to update session state before redirect
+        toast.success('Signed in successfully!');
+        // Small delay to ensure session is established
+        await new Promise(resolve => setTimeout(resolve, 100));
         router.refresh();
         router.push(callbackUrl);
       } else {
+        console.error('Sign in failed without error:', result);
         toast.error('Sign in failed. Please try again.');
         setIsLoading(false);
       }
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('Sign in exception:', error);
       toast.error('An error occurred. Please try again.');
       setIsLoading(false);
     }

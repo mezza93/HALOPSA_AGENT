@@ -31,7 +31,7 @@ export default function AuthLayout({
         </div>
 
         <p className="text-sm text-white/60">
-          &copy; {new Date().getFullYear()} HaloPSA AI. All rights reserved.
+          &copy; 2025 HaloPSA AI. All rights reserved.
         </p>
       </div>
 
