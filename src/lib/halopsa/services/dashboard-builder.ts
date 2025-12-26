@@ -474,18 +474,44 @@ export class DashboardBuilderService {
 
   /**
    * Get existing report or create new one for a widget template.
+   * If a "Dashboard - *" report exists, it will be deleted and recreated with fresh SQL.
    */
   async getOrCreateReport(template: WidgetTemplate): Promise<number | null> {
-    // First try to find existing report
+    // Check if we have our auto-created report that might have old/bad SQL
+    const reports = await this.getAllReports();
+    const dashboardReportName = template.fallbackReportName;
+
+    if (dashboardReportName) {
+      // Look for existing auto-created dashboard report
+      const existingDashboardReport = reports.find(
+        r => r.name === dashboardReportName || r.name?.startsWith('Dashboard - ')
+      );
+
+      if (existingDashboardReport && existingDashboardReport.id) {
+        // Delete the old report and create a fresh one with updated SQL
+        console.log(`[DashboardBuilder] Found old dashboard report '${existingDashboardReport.name}' (ID: ${existingDashboardReport.id}), will create fresh report`);
+        try {
+          await this.reportService.delete(existingDashboardReport.id);
+          console.log(`[DashboardBuilder] Deleted old report ID: ${existingDashboardReport.id}`);
+          this.reportCache = null; // Clear cache
+        } catch (err) {
+          console.warn(`[DashboardBuilder] Could not delete old report: ${err}`);
+          // Continue anyway - we'll create a new one with a slightly different name
+        }
+      }
+    }
+
+    // Try to find a non-dashboard report that matches keywords
     if (template.reportKeywords.length > 0) {
       const existing = await this.findMatchingReport(template.reportKeywords);
-      if (existing && existing.id) {
+      // Only use if it's NOT a Dashboard auto-created report (which might have bad SQL)
+      if (existing && existing.id && !existing.name?.startsWith('Dashboard - ')) {
         console.log(`[DashboardBuilder] Using existing report '${existing.name}' for ${template.name}`);
         return existing.id;
       }
     }
 
-    // Create new report
+    // Create new report with fresh SQL
     const newReport = await this.createReportForWidget(template);
     if (newReport && newReport.id) {
       return newReport.id;
