@@ -11,6 +11,7 @@ const navLinks = [
   { href: '#demo', label: 'Demo' },
   { href: '#testimonials', label: 'Testimonials' },
   { href: '#pricing', label: 'Pricing' },
+  { href: '/roadmap', label: 'Roadmap' },
 ];
 
 export function LandingNav() {

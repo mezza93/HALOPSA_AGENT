@@ -100,7 +100,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Skip auth checks for public routes
-  if (pathname.startsWith('/api/auth') || pathname === '/' || pathname.startsWith('/_next')) {
+  if (pathname.startsWith('/api/auth') || pathname === '/' || pathname.startsWith('/_next') || pathname === '/roadmap') {
     return response;
   }
 

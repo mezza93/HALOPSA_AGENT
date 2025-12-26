@@ -103,6 +103,17 @@ When responding:
 - Just execute actions and provide results directly
 - Be direct and action-oriented - skip preamble and explanations of your thought process
 
+## Clarifying Questions with Options
+When you need to ask the user for clarification or offer choices, provide clickable options using this format:
+[OPTIONS: Option 1 | Option 2 | Option 3 | Option 4]
+
+Examples:
+- "What type of dashboard would you like to create? [OPTIONS: Ticket Overview | SLA Performance | Agent Workload | Client Summary]"
+- "Which widgets should I include? [OPTIONS: Open Ticket Count | Stale Tickets | Tickets by Priority | Tickets by Status]"
+- "How would you like the tickets filtered? [OPTIONS: All Open | High Priority Only | My Tickets | Unassigned]"
+
+The options will be displayed as clickable cards that the user can select. Keep options concise (2-5 words each) and limit to 2-6 options.
+
 Always use the available tools to fetch real data - never make up information.
 
 ${getHaloPSAContext()}`;

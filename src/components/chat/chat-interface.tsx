@@ -7,6 +7,7 @@ import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { ChatHeader } from './chat-header';
 import { ChatWelcome } from './chat-welcome';
+import { OptionCards } from './option-cards';
 import { useConnectionStore } from '@/stores/connection-store';
 
 interface ChatInterfaceProps {
@@ -121,6 +122,38 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
     setInput(action);
   };
 
+  // Handle option card selection
+  const handleOptionSelect = (option: string) => {
+    setInput(option);
+    // Auto-submit after a short delay to show the selection
+    setTimeout(() => {
+      const form = document.querySelector('form');
+      if (form) {
+        form.requestSubmit();
+      }
+    }, 100);
+  };
+
+  // Parse options from the last assistant message
+  const getOptionsFromLastMessage = () => {
+    if (messages.length === 0) return null;
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role !== 'assistant') return null;
+
+    // Look for options in a specific format: [OPTIONS: option1 | option2 | option3]
+    const optionsMatch = lastMessage.content.match(/\[OPTIONS:\s*([^\]]+)\]/i);
+    if (optionsMatch) {
+      const options = optionsMatch[1].split('|').map((o) => o.trim()).filter(Boolean);
+      if (options.length >= 2) {
+        return options;
+      }
+    }
+
+    return null;
+  };
+
+  const options = getOptionsFromLastMessage();
+
   return (
     <div className="flex h-full flex-col relative">
       {/* Grainy texture overlay */}
@@ -153,6 +186,14 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
                 isLoading={isLoading && message === messages[messages.length - 1]}
               />
             ))
+          )}
+
+          {/* Option cards */}
+          {options && !isLoading && (
+            <OptionCards
+              options={options}
+              onSelect={handleOptionSelect}
+            />
           )}
 
           {/* Error state */}
