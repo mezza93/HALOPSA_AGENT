@@ -1,10 +1,19 @@
 import { anthropic } from '@ai-sdk/anthropic';
-import { streamText } from 'ai';
+import { streamText, type CoreTool } from 'ai';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/utils/encryption';
 import { createHaloToolsFromConfig, toolCategories } from '@/lib/ai/tools';
 import { getHaloPSAContext } from '@/lib/context/halopsa-context';
+
+// Log environment check on startup (only in development)
+if (process.env.NODE_ENV === 'development') {
+  console.log('[Chat API] Environment check:', {
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasEncryptionKey: !!process.env.ENCRYPTION_KEY,
+    nodeEnv: process.env.NODE_ENV,
+  });
+}
 
 // System prompt for the AI agent
 const SYSTEM_PROMPT = `You are an AI assistant for HaloPSA, a Professional Services Automation (PSA) platform used by IT Managed Service Providers (MSPs). You help technicians and managers interact with their HaloPSA data through natural language.
@@ -100,16 +109,47 @@ ${getHaloPSAContext()}`;
 
 export async function POST(req: Request) {
   try {
+    // Check for required environment variables
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('[Chat API] Missing ANTHROPIC_API_KEY environment variable');
+      return new Response(
+        JSON.stringify({ error: 'AI service not configured. Please contact support.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Authenticate user
     const session = await auth();
     if (!session?.user) {
-      return new Response('Unauthorized', { status: 401 });
+      console.error('[Chat API] No authenticated session');
+      return new Response(
+        JSON.stringify({ error: 'Please sign in to continue.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    const { messages, connectionId, sessionId: existingSessionId } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('[Chat API] Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { messages, connectionId, sessionId: existingSessionId } = body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No messages provided.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get connection details
-    let tools = {};
+    let tools: Record<string, CoreTool> = {};
     let connectionContext = '';
 
     // Try to find the specified connection, or fall back to user's default/first active connection
@@ -143,16 +183,22 @@ export async function POST(req: Request) {
 
       // Decrypt credentials and create tools
       try {
-        const clientId = decrypt(connection.clientId);
-        const clientSecret = decrypt(connection.clientSecret);
-        tools = createHaloToolsFromConfig({
-          baseUrl: connection.baseUrl,
-          clientId,
-          clientSecret,
-          tenant: connection.tenant || undefined,
-        });
+        if (!process.env.ENCRYPTION_KEY) {
+          console.error('[Chat API] Missing ENCRYPTION_KEY environment variable');
+          connectionContext += '\n\nWarning: Encryption not configured. Please contact support.';
+        } else {
+          const clientId = decrypt(connection.clientId);
+          const clientSecret = decrypt(connection.clientSecret);
+          tools = createHaloToolsFromConfig({
+            baseUrl: connection.baseUrl,
+            clientId,
+            clientSecret,
+            tenant: connection.tenant || undefined,
+          });
+          console.log('[Chat API] Created', Object.keys(tools).length, 'HaloPSA tools');
+        }
       } catch (err) {
-        console.error('Failed to decrypt credentials:', err);
+        console.error('[Chat API] Failed to decrypt credentials or create tools:', err);
         connectionContext += '\n\nWarning: Unable to connect to HaloPSA. Please check your connection settings.';
       }
 
@@ -240,13 +286,17 @@ export async function POST(req: Request) {
     }
 
     // Stream the response
-    const result = streamText({
-      model: anthropic('claude-sonnet-4-20250514'),
-      system: SYSTEM_PROMPT + connectionContext,
-      messages,
-      tools,
-      maxSteps: 15, // Allow multiple tool calls for complex operations
-      onFinish: async ({ text, usage, toolCalls, toolResults }) => {
+    console.log('[Chat API] Starting stream with', Object.keys(tools).length, 'tools');
+
+    let result;
+    try {
+      result = streamText({
+        model: anthropic('claude-sonnet-4-20250514'),
+        system: SYSTEM_PROMPT + connectionContext,
+        messages,
+        tools: Object.keys(tools).length > 0 ? tools : undefined,
+        maxSteps: 15, // Allow multiple tool calls for complex operations
+        onFinish: async ({ text, usage, toolCalls, toolResults }) => {
         // Save assistant message to database
         if (chatSessionId && text) {
           try {
@@ -305,26 +355,65 @@ export async function POST(req: Request) {
           }
         }
       },
-    });
+      });
+    } catch (streamError) {
+      console.error('[Chat API] Stream creation error:', streamError);
+      const errorMessage = streamError instanceof Error ? streamError.message : 'Unknown streaming error';
+
+      // Check for specific Anthropic API errors
+      if (errorMessage.includes('API key') || errorMessage.includes('api_key')) {
+        return new Response(
+          JSON.stringify({ error: 'AI service configuration error. Please contact support.' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (errorMessage.includes('rate') || errorMessage.includes('429')) {
+        return new Response(
+          JSON.stringify({ error: 'Too many requests. Please wait a moment and try again.' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (errorMessage.includes('model') || errorMessage.includes('not found')) {
+        return new Response(
+          JSON.stringify({ error: 'AI model configuration error. Please contact support.' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      throw streamError; // Re-throw to be caught by outer handler
+    }
 
     return result.toDataStreamResponse();
   } catch (error) {
-    console.error('Chat API error:', error);
+    console.error('[Chat API] Unhandled error:', error);
+
+    // Log full error details for debugging
+    if (error instanceof Error) {
+      console.error('[Chat API] Error name:', error.name);
+      console.error('[Chat API] Error message:', error.message);
+      console.error('[Chat API] Error stack:', error.stack);
+    }
 
     // Provide more specific error messages
-    let errorMessage = 'Internal server error';
+    let errorMessage = 'Something went wrong. Please try again.';
     let statusCode = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('API key')) {
+      const msg = error.message.toLowerCase();
+
+      if (msg.includes('api key') || msg.includes('api_key') || msg.includes('unauthorized')) {
         errorMessage = 'AI service configuration error. Please contact support.';
-      } else if (error.message.includes('rate limit')) {
+      } else if (msg.includes('rate limit') || msg.includes('429') || msg.includes('too many')) {
         errorMessage = 'Too many requests. Please wait a moment and try again.';
         statusCode = 429;
-      } else if (error.message.includes('connection') || error.message.includes('timeout')) {
+      } else if (msg.includes('connection') || msg.includes('timeout') || msg.includes('network') || msg.includes('econnrefused')) {
         errorMessage = 'Connection error. Please check your internet and try again.';
-      } else if (error.message.includes('decrypt')) {
+      } else if (msg.includes('decrypt') || msg.includes('encryption')) {
         errorMessage = 'HaloPSA connection error. Please reconfigure your connection in Settings.';
+      } else if (msg.includes('prisma') || msg.includes('database')) {
+        errorMessage = 'Database error. Please try again later.';
+      } else if (msg.includes('model') || msg.includes('not found')) {
+        errorMessage = 'AI model not available. Please try again later.';
       }
     }
 

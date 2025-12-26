@@ -41,7 +41,21 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
     },
     onError: (err) => {
       console.error('Chat error:', err);
-      toast.error('Failed to send message. Please try again.');
+      // Try to extract a user-friendly error message
+      let errorMessage = 'Failed to send message. Please try again.';
+      if (err.message) {
+        // The AI SDK may return the error message from the API
+        if (err.message.includes('AI service')) {
+          errorMessage = err.message;
+        } else if (err.message.includes('rate limit') || err.message.includes('429')) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (err.message.includes('network') || err.message.includes('connection')) {
+          errorMessage = 'Connection error. Please check your internet.';
+        } else if (err.message.includes('unauthorized') || err.message.includes('401')) {
+          errorMessage = 'Session expired. Please refresh the page.';
+        }
+      }
+      toast.error(errorMessage);
     },
     onFinish: () => {
       // Clear attachments after successful message
