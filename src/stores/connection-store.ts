@@ -15,10 +15,14 @@ interface HaloConnection {
 interface ConnectionState {
   connections: HaloConnection[];
   activeConnection: HaloConnection | null;
+  isLoading: boolean;
+  isInitialized: boolean;
   setConnections: (connections: HaloConnection[]) => void;
   setActiveConnection: (connection: HaloConnection | null) => void;
   addConnection: (connection: HaloConnection) => void;
   removeConnection: (id: string) => void;
+  fetchConnections: () => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 export const useConnectionStore = create<ConnectionState>()(
@@ -26,13 +30,18 @@ export const useConnectionStore = create<ConnectionState>()(
     (set, get) => ({
       connections: [],
       activeConnection: null,
+      isLoading: false,
+      isInitialized: false,
 
       setConnections: (connections) => {
         set({ connections });
-        // Set first active connection as default
-        const active = connections.find((c) => c.isActive);
-        if (active && !get().activeConnection) {
-          set({ activeConnection: active });
+        // Set first active connection as default if none selected
+        const current = get().activeConnection;
+        if (!current || !connections.find(c => c.id === current.id)) {
+          const active = connections.find((c) => c.isActive);
+          if (active) {
+            set({ activeConnection: active });
+          }
         }
       },
 
@@ -55,13 +64,42 @@ export const useConnectionStore = create<ConnectionState>()(
               : state.activeConnection,
         }));
       },
+
+      fetchConnections: async () => {
+        set({ isLoading: true });
+        try {
+          const response = await fetch('/api/halopsa/connections');
+          if (response.ok) {
+            const data = await response.json();
+            // API returns array directly
+            const rawConnections = Array.isArray(data) ? data : (data.connections || []);
+            const connections = rawConnections.map((c: { id: string; name: string; baseUrl: string; isActive: boolean }) => ({
+              id: c.id,
+              name: c.name,
+              baseUrl: c.baseUrl,
+              isActive: c.isActive,
+            }));
+            get().setConnections(connections);
+          }
+        } catch (error) {
+          console.error('Failed to fetch connections:', error);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      initialize: async () => {
+        if (get().isInitialized) return;
+
+        set({ isInitialized: true });
+        await get().fetchConnections();
+      },
     }),
     {
       name: 'halopsa-connections',
       partialize: (state) => ({
-        activeConnection: state.activeConnection
-          ? { id: state.activeConnection.id }
-          : null,
+        // Persist the full activeConnection object
+        activeConnection: state.activeConnection,
       }),
     }
   )

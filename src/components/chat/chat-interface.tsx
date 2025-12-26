@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useChat, Message } from 'ai/react';
+import { useChat } from 'ai/react';
 import { toast } from 'sonner';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
@@ -17,7 +17,12 @@ interface ChatInterfaceProps {
 export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const { activeConnection } = useConnectionStore();
+  const { activeConnection, initialize, isLoading: isLoadingConnection } = useConnectionStore();
+
+  // Initialize connection store on mount
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const {
     messages,
