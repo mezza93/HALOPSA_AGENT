@@ -12,6 +12,7 @@ import {
   HelpCircle,
   Sparkles,
   LogOut,
+  BookOpen,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils/cn';
@@ -29,6 +30,7 @@ interface SidebarProps {
 const navigation = [
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'History', href: '/chat/history', icon: History },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Connections', href: '/settings/connections', icon: Link2 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

@@ -64,6 +64,18 @@ You have access to comprehensive tools organized by category:
 - Schedule automated reports
 - Manage dashboards and widgets
 
+**Configuration (${toolCategories.configuration.length} tools)**
+- List and manage custom fields
+- View ticket statuses, types, priorities, categories
+- Manage workflows (list, toggle on/off)
+- Manage email and ticket templates
+
+**Attachments (${toolCategories.attachments.length} tools)**
+- List attachments on tickets
+- Get attachment details
+- Delete attachments
+- Copy attachments between tickets
+
 ## Response Guidelines
 
 When responding:
@@ -90,38 +102,86 @@ export async function POST(req: Request) {
     let tools = {};
     let connectionContext = '';
 
+    // Try to find the specified connection, or fall back to user's default/first active connection
+    let connection = null;
     if (connectionId) {
-      const connection = await prisma.haloConnection.findFirst({
+      connection = await prisma.haloConnection.findFirst({
         where: {
           id: connectionId,
           userId: session.user.id,
           isActive: true,
         },
       });
+    }
 
-      if (connection) {
-        connectionContext = `\n\nConnected to HaloPSA instance: ${connection.name} (${connection.baseUrl})`;
+    // Fallback: find user's default connection or first active one
+    if (!connection) {
+      connection = await prisma.haloConnection.findFirst({
+        where: {
+          userId: session.user.id,
+          isActive: true,
+        },
+        orderBy: [
+          { isDefault: 'desc' },
+          { createdAt: 'asc' },
+        ],
+      });
+    }
 
-        // Decrypt credentials and create tools
-        try {
-          const clientId = decrypt(connection.clientId);
-          const clientSecret = decrypt(connection.clientSecret);
-          tools = createHaloToolsFromConfig({
-            baseUrl: connection.baseUrl,
-            clientId,
-            clientSecret,
-            tenant: connection.tenant || undefined,
-          });
-        } catch (err) {
-          console.error('Failed to decrypt credentials:', err);
-          connectionContext += '\n\nWarning: Unable to connect to HaloPSA. Please check your connection settings.';
-        }
+    if (connection) {
+      connectionContext = `\n\nConnected to HaloPSA instance: ${connection.name} (${connection.baseUrl})`;
 
-        // Update last used timestamp
-        await prisma.haloConnection.update({
-          where: { id: connection.id },
-          data: { lastUsedAt: new Date() },
+      // Decrypt credentials and create tools
+      try {
+        const clientId = decrypt(connection.clientId);
+        const clientSecret = decrypt(connection.clientSecret);
+        tools = createHaloToolsFromConfig({
+          baseUrl: connection.baseUrl,
+          clientId,
+          clientSecret,
+          tenant: connection.tenant || undefined,
         });
+      } catch (err) {
+        console.error('Failed to decrypt credentials:', err);
+        connectionContext += '\n\nWarning: Unable to connect to HaloPSA. Please check your connection settings.';
+      }
+
+      // Update last used timestamp
+      await prisma.haloConnection.update({
+        where: { id: connection.id },
+        data: { lastUsedAt: new Date() },
+      });
+
+      // Load knowledge base context for better AI responses
+      try {
+        const kbItems = await prisma.knowledgeBaseItem.findMany({
+          where: { userId: session.user.id },
+          select: {
+            category: true,
+            subcategory: true,
+            title: true,
+            summary: true,
+          },
+        });
+
+        if (kbItems.length > 0) {
+          // Group by category and build context
+          const kbByCategory: Record<string, string[]> = {};
+          for (const item of kbItems) {
+            if (!kbByCategory[item.category]) {
+              kbByCategory[item.category] = [];
+            }
+            kbByCategory[item.category].push(item.summary || item.title);
+          }
+
+          connectionContext += '\n\n## Your HaloPSA Configuration\n';
+          for (const [category, items] of Object.entries(kbByCategory)) {
+            const categoryLabel = category.replace('_', ' ').toLowerCase();
+            connectionContext += `\n**${categoryLabel}:** ${items.slice(0, 10).join(', ')}${items.length > 10 ? ` (+${items.length - 10} more)` : ''}`;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load knowledge base context:', err);
       }
     }
 

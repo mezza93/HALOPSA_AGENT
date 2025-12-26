@@ -326,3 +326,80 @@ model UsageRecord {
   @@index([userId])
   @@index([periodStart])
 }
+
+// ===========================================
+// Knowledge Base (Local Cache)
+// ===========================================
+
+// Stores synced HaloPSA configuration and data for AI context
+model KnowledgeBaseItem {
+  id            String    @id @default(cuid())
+  userId        String
+
+  // Item categorization
+  category      KBCategory
+  subcategory   String?   // e.g., "ticket_types", "priorities", etc.
+
+  // Content
+  title         String
+  content       String    @db.Text  // JSON or markdown content
+  summary       String?   // Brief summary for AI context
+
+  // Metadata
+  sourceId      String?   // ID from HaloPSA
+  sourceName    String?   // Original name from HaloPSA
+  metadata      Json?     // Additional structured data
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([userId, category])
+}
+
+enum KBCategory {
+  CONFIGURATION    // Ticket types, statuses, priorities, categories
+  CLIENTS          // Client/customer information
+  AGENTS           // Team structure, agent info
+  WORKFLOWS        // Automation rules, escalations
+  TEMPLATES        // Email and ticket templates
+  CONTRACTS        // Contract types, SLA definitions
+  CUSTOM_FIELDS    // Custom field definitions
+  INTEGRATIONS     // Connected systems, webhooks
+  BEST_PRACTICES   // User-defined best practices
+}
+
+// Tracks sync operations
+model KnowledgeBaseSync {
+  id            String    @id @default(cuid())
+  userId        String
+
+  // Sync status
+  status        SyncStatus  @default(PENDING)
+  syncType      String      // "full", "incremental", "manual"
+
+  // Results
+  itemsAdded    Int         @default(0)
+  itemsUpdated  Int         @default(0)
+  itemsRemoved  Int         @default(0)
+  errorCount    Int         @default(0)
+  errors        Json?       // Array of error messages
+
+  // Timing
+  startedAt     DateTime    @default(now())
+  completedAt   DateTime?
+  syncedAt      DateTime    @default(now())
+
+  @@index([userId])
+  @@index([syncedAt])
+}
+
+enum SyncStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PARTIAL
+}
