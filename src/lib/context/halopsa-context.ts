@@ -183,56 +183,135 @@ export const DASHBOARD_CONTEXT = `## HaloPSA Dashboard & Reporting
 `;
 
 /**
- * HaloPSA API Reference - Key Endpoints
+ * HaloPSA API Reference - Comprehensive Endpoints
+ * Source: HaloPSA OpenAPI Specification v2
  */
-export const API_REFERENCE = `## HaloPSA API Endpoints Reference
+export const API_REFERENCE = `## HaloPSA API Endpoints Reference (OpenAPI v2)
 
-### Core Endpoints
-| Endpoint | Methods | Description |
-|----------|---------|-------------|
-| /Tickets | GET, POST | List/search tickets, create tickets |
-| /Tickets/{id} | GET, POST, DELETE | Get/update/delete specific ticket |
-| /Actions | GET, POST | Ticket actions/notes |
-| /Client | GET, POST | Client management |
-| /Site | GET, POST | Site management |
-| /Users | GET, POST | End-user management |
-| /Agent | GET, POST | Agent management |
-| /Team | GET | Team/department info |
-| /Asset | GET, POST | Asset/device management |
-| /Contract | GET, POST | Contract management |
-| /Invoice | GET, POST | Invoice management |
-| /Report | GET, POST | Report execution |
-| /KBArticle | GET, POST | Knowledge base articles |
+### Ticket Operations
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Tickets | GET | List tickets | count, agent_id, client_id, status_id, priority_id, open_only, search, advanced_search |
+| /Tickets | POST | Create ticket | (body: summary, details, client_id, tickettype_id, etc.) |
+| /Tickets/{id} | GET | Get single ticket | includedetails, includediagramdetails |
+| /Tickets/{id} | POST | Update ticket | (body with updated fields) |
+| /Tickets/{id} | DELETE | Delete ticket | reason |
 
-### Configuration Endpoints
-| Endpoint | Description |
-|----------|-------------|
-| /Status | Ticket statuses |
-| /Priority | Priorities |
-| /TicketType | Ticket types |
-| /Category | Categories |
-| /CustomField | Custom fields |
-| /Workflow | Automation workflows |
-| /EmailTemplate | Email templates |
-| /SLA | SLA definitions |
+### Actions (Ticket Notes)
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Actions | GET | List actions | ticket_id, agent_only, count, startdate, enddate, excludeprivate |
+| /Actions | POST | Add action | (body: ticket_id, note, outcome, timetaken, etc.) |
+| /Actions/{id} | GET | Get single action | includedetails, includeemail |
+| /Actions/{id} | DELETE | Delete action | |
 
-### Common Query Parameters
-- \`count\` - Number of records to return (default: 50)
+### Clients & Sites
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Client | GET | List clients | count, search, activeinactive, domain, advanced_search |
+| /Client | POST | Create client | (body: name, email, phone, etc.) |
+| /Client/{id} | GET | Get client | includedetails, includeactivity |
+| /Site | GET | List sites | client_id, count, activeinactive |
+| /Site | POST | Create site | (body: client_id, name, address, etc.) |
+| /Site/{id} | GET | Get site | includedetails |
+| /Users | GET | List end-users | client_id, site_id, count, search |
+| /Users | POST | Create user | (body: name, email, client_id, etc.) |
+| /Users/{id} | GET | Get user | includedetails, includeusersassets |
+
+### Agents & Teams
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Agent | GET | List agents | activeinactive, department_id, client_id, can_edit_only |
+| /Agent | POST | Create/update agent | (body with agent details) |
+| /Agent/{id} | GET | Get agent | includedetails, getholidayallowance |
+| /Agent/me | GET | Get current agent | |
+| /Team | GET | List teams | department_id, includeagentsforteams |
+| /Team/{id} | GET | Get team | includeagents, includedetails |
+
+### Assets
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Asset | GET | List assets | client_id, site_id, assettype_id, assetgroup_id, search, activeinactive |
+| /Asset | POST | Create asset | (body: name, client_id, assettype_id, etc.) |
+| /Asset/{id} | GET | Get asset | includedetails, includeactivity, includehierarchy |
+
+### Contracts & Billing
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /ClientContract | GET | List contracts | client_id, count, includeinactive, excluderenewed |
+| /ClientContract | POST | Create contract | (body: client_id, ref, startdate, enddate, etc.) |
+| /ClientContract/{id} | GET | Get contract | includedetails, includeperiods |
+| /Invoice | GET | List invoices | client_id, posted, count |
+| /Invoice | POST | Create invoice | (body with invoice details) |
+| /Invoice/{id} | GET | Get invoice | includedetails |
+
+### Reports & Dashboards
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Report | GET | List reports | category, count, search |
+| /Report | POST | Create report | (body: name, sqlquery, category, etc.) |
+| /Report/{id} | GET | Get report | includedetails |
+| /Report/{id}/run | GET | Run report | startdate, enddate, client_id, agent_id |
+| /Dashboard | GET | List dashboards | is_shared, count |
+| /Dashboard/{id} | GET | Get dashboard | includewidgets |
+| /DashboardWidget | POST | Add widget | (body: dashboard_id, widget_type, report_id, etc.) |
+
+### Knowledge Base
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /KBArticle | GET | List articles | category, search, count |
+| /KBArticle | POST | Create article | (body: title, content, category, etc.) |
+| /KBArticle/{id} | GET | Get article | includedetails |
+
+### Configuration
+| Endpoint | Method | Description | Key Parameters |
+|----------|--------|-------------|----------------|
+| /Status | GET | List ticket statuses | |
+| /Priority | GET | List priorities | |
+| /TicketType | GET | List ticket types | includedetails |
+| /Category | GET | List categories | toplevel_id |
+| /CustomField | GET | List custom fields | entity, type |
+| /Workflow | GET | List workflows | type |
+| /SLA | GET | List SLAs | |
+| /EmailTemplate | GET | List email templates | |
+
+### Additional Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| /Appointment | GET/POST | Calendar appointments |
+| /Opportunity | GET/POST | Sales opportunities |
+| /Quote | GET/POST | Quotes/proposals |
+| /Project | GET/POST | Projects |
+| /Supplier | GET/POST | Suppliers |
+| /Item | GET/POST | Inventory items |
+| /TimeSheet | GET/POST | Timesheets |
+| /Attachment | GET/POST | File attachments |
+
+### Common Query Parameters (All Endpoints)
+- \`count\` - Number of records (default: 50, max: 1000)
 - \`page_no\` - Page number for pagination
-- \`search\` - Text search across records
-- \`order\` - Sort field
+- \`page_size\` - Records per page
+- \`search\` - Text search
+- \`order\` - Sort field name
 - \`orderdesc\` - Sort descending (true/false)
-- \`ticketidonly\` - Return only ticket IDs (faster)
+- \`includedetails\` - Include full details
+- \`advanced_search\` - Complex search JSON
 
-### Filtering Tickets
-- \`client_id\` - Filter by client
-- \`site_id\` - Filter by site
+### Ticket Filtering Parameters
+- \`client_id\` - Filter by client ID
+- \`site_id\` - Filter by site ID
 - \`agent_id\` - Filter by assigned agent
-- \`status_id\` - Filter by status
-- \`priority_id\` - Filter by priority
+- \`team\` - Filter by team name
+- \`status_id\` - Filter by status ID
+- \`priority_id\` - Filter by priority ID
 - \`tickettype_id\` - Filter by ticket type
-- \`open_only\` - Only open tickets
-- \`dateoccured_start/end\` - Date range filter
+- \`category_1/2/3/4\` - Filter by category levels
+- \`open_only\` - Only open tickets (true/false)
+- \`dateoccured_start\` - Created after date
+- \`dateoccured_end\` - Created before date
+- \`dateclosed_start\` - Closed after date
+- \`dateclosed_end\` - Closed before date
+- \`sla_status\` - SLA state (I=In, O=Out)
 `;
 
 /**
