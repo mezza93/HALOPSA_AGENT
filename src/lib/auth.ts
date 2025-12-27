@@ -62,7 +62,9 @@ const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
+      // SECURITY: Disabled dangerous email account linking
+      // This prevents account takeover attacks where an attacker
+      // could link their Google account to an existing user's email
     }),
 
     // Email/Password

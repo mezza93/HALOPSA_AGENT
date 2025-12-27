@@ -1,24 +1,36 @@
 /**
- * Simple AI test endpoint to diagnose issues.
- * GET /api/test-ai - Tests the Anthropic API connection
- * POST /api/test-ai - Tests streaming like the chat endpoint
+ * AI test endpoint to diagnose issues.
+ * GET /api/test-ai - Tests the Anthropic API connection (requires authentication)
+ * POST /api/test-ai - Tests streaming like the chat endpoint (requires authentication)
+ *
+ * SECURITY: This endpoint requires authentication to prevent abuse.
  */
 
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText, streamText } from 'ai';
+import { auth } from '@/lib/auth';
 
 export async function GET() {
+  // Require authentication
+  const session = await auth();
+  if (!session?.user) {
+    return Response.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
   const checks: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     hasApiKey: !!process.env.ANTHROPIC_API_KEY,
-    apiKeyPrefix: process.env.ANTHROPIC_API_KEY?.substring(0, 10) + '...',
+    // SECURITY: Never expose API key prefix in production
   };
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return Response.json({
       ...checks,
       status: 'error',
-      error: 'ANTHROPIC_API_KEY is not set',
+      error: 'AI service not configured',
     }, { status: 500 });
   }
 
@@ -35,36 +47,45 @@ export async function GET() {
       status: 'success',
       model: 'claude-sonnet-4-20250514',
       response: result.text,
-      usage: result.usage,
+      usage: {
+        promptTokens: result.usage?.promptTokens,
+        completionTokens: result.usage?.completionTokens,
+      },
     });
   } catch (error) {
-    const errorDetails: Record<string, unknown> = {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-    };
-
-    if (error instanceof Error && 'cause' in error) {
-      errorDetails.cause = String(error.cause);
-    }
+    // SECURITY: Don't expose detailed error info in production
+    const message = error instanceof Error ? error.message : 'Unknown error';
 
     return Response.json({
       ...checks,
       status: 'error',
-      error: errorDetails,
+      error: process.env.NODE_ENV === 'development' ? message : 'AI service error',
     }, { status: 500 });
   }
 }
 
 // Test streaming like the chat endpoint does
 export async function POST(req: Request) {
+  // Require authentication
+  const session = await auth();
+  if (!session?.user) {
+    return Response.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { message = 'Say hello' } = body;
 
+    // Limit message length to prevent abuse
+    const sanitizedMessage = String(message).slice(0, 1000);
+
     const result = streamText({
       model: anthropic('claude-sonnet-4-20250514'),
       system: 'You are a helpful assistant. Be brief.',
-      messages: [{ role: 'user', content: message }],
+      messages: [{ role: 'user', content: sanitizedMessage }],
     });
 
     return result.toDataStreamResponse();
@@ -72,7 +93,7 @@ export async function POST(req: Request) {
     console.error('Test streaming error:', error);
     return Response.json({
       status: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: 'AI service error',
     }, { status: 500 });
   }
 }

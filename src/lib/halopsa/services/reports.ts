@@ -451,6 +451,12 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
    * Note: HaloPSA API expects lowercase snake_case field names:
    * - 'sql' for the SQL query (not sqlQuery)
    * - 'isshared' for sharing flag (not isShared)
+   *
+   * For charts to work, you MUST provide chart configuration:
+   * - chartType: 0=bar, 1=line, 2=pie, 3=doughnut
+   * - xAxis: Column name from SQL for X-axis
+   * - yAxis: Column name from SQL for Y-axis (typically 'Count')
+   * - count: true to count rows
    */
   async createCustomReport(options: {
     name: string;
@@ -458,8 +464,31 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
     description?: string;
     category?: string;
     isShared?: boolean;
+    // Chart configuration - REQUIRED for charts to work
+    chartType?: number;      // 0=bar, 1=line, 2=pie, 3=doughnut
+    xAxis?: string;          // X-axis column name from SQL
+    yAxis?: string;          // Y-axis column name (e.g., 'Count')
+    xAxisCaption?: string;   // X-axis label
+    yAxisCaption?: string;   // Y-axis label
+    chartTitle?: string;     // Chart title
+    count?: boolean;         // Count mode (true for counting rows)
+    showGraphValues?: boolean; // Show values on chart
   }): Promise<Report> {
-    const { name, sqlQuery, description, category, isShared = false } = options;
+    const {
+      name,
+      sqlQuery,
+      description,
+      category,
+      isShared = false,
+      chartType,
+      xAxis,
+      yAxis,
+      xAxisCaption,
+      yAxisCaption,
+      chartTitle,
+      count = true,
+      showGraphValues = true,
+    } = options;
 
     // Build API payload with correct field names
     const apiData: Record<string, unknown> = {
@@ -470,6 +499,19 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
 
     if (description) apiData.description = description;
     if (category) apiData.category = category;
+
+    // Chart configuration - critical for charts to display
+    if (chartType !== undefined) {
+      apiData.charttype = chartType;
+      apiData.count = count;
+      apiData.showgraphvalues = showGraphValues;
+
+      if (xAxis) apiData.xaxis = xAxis;
+      if (yAxis) apiData.yaxis = yAxis;
+      if (xAxisCaption) apiData.xaxiscaption = xAxisCaption;
+      if (yAxisCaption) apiData.yaxiscaption = yAxisCaption;
+      if (chartTitle) apiData.charttitle = chartTitle || name;
+    }
 
     // Post directly to ensure correct field names are used
     const response = await this.client.post<ReportApiResponse[] | ReportApiResponse>(
@@ -716,6 +758,10 @@ export class ReportRepositoryService {
     options: {
       name?: string; // Override the report name
       isShared?: boolean;
+      // Chart configuration overrides (optional)
+      chartType?: number;
+      xAxis?: string;
+      yAxis?: string;
     } = {}
   ): Promise<Report> {
     // Fetch the full report from the repository
@@ -725,14 +771,29 @@ export class ReportRepositoryService {
       throw new Error(`Repository report ${repositoryReportId} does not have SQL - cannot import.`);
     }
 
-    // Create a local copy of the report
-    const localReport = await reportService.createCustomReport({
+    // Build report options including chart configuration from repository or overrides
+    const reportOptions: Parameters<typeof reportService.createCustomReport>[0] = {
       name: options.name ?? repoReport.name ?? `Imported Report ${repositoryReportId}`,
       sqlQuery: repoReport.sql,
       description: repoReport.description ?? `Imported from HaloPSA Report Repository (ID: ${repositoryReportId})`,
       category: repoReport.category ?? 'Imported',
       isShared: options.isShared ?? true,
-    });
+    };
+
+    // Include chart configuration from repository or overrides
+    if (options.chartType !== undefined || repoReport.chartType !== undefined) {
+      reportOptions.chartType = options.chartType ?? repoReport.chartType;
+      reportOptions.xAxis = options.xAxis ?? repoReport.xAxis;
+      reportOptions.yAxis = options.yAxis ?? repoReport.yAxis;
+      reportOptions.chartTitle = repoReport.chartTitle ?? repoReport.name;
+      reportOptions.count = true;
+      reportOptions.showGraphValues = true;
+
+      console.log(`[ReportRepository] Importing with chart config: chartType=${reportOptions.chartType}, xAxis='${reportOptions.xAxis}', yAxis='${reportOptions.yAxis}'`);
+    }
+
+    // Create a local copy of the report
+    const localReport = await reportService.createCustomReport(reportOptions);
 
     console.log(`[ReportRepository] Imported report '${localReport.name}' (ID: ${localReport.id}) from repository ID ${repositoryReportId}`);
 

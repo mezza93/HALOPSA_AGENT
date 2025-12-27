@@ -20,6 +20,12 @@ interface WidgetTemplate {
   reportKeywords: string[];
   fallbackSql: string | null;
   fallbackReportName: string | null;
+  // Chart configuration - REQUIRED for charts to display properly
+  chartType?: number;      // 0=bar, 1=line, 2=pie, 3=doughnut
+  xAxis?: string;          // X-axis column name from SQL (first column)
+  yAxis?: string;          // Y-axis column name from SQL (second column, often 'Count')
+  xAxisCaption?: string;   // X-axis label displayed on chart
+  yAxisCaption?: string;   // Y-axis label displayed on chart
   // For filter-based widgets
   filterId: number | null;
   ticketareaId: number | null;
@@ -104,6 +110,7 @@ export const WIDGET_TEMPLATES: Record<string, WidgetTemplate> = {
   // Chart widgets (report-based, types 0, 1)
   // Using proven HaloPSA table/column names with proper JOINs
   // Key: Use Fdeleted = fmergedintofaultid for non-deleted check
+  // IMPORTANT: Chart config (chartType, xAxis, yAxis) MUST match SQL column aliases
   tickets_by_priority: {
     name: 'Tickets by Priority',
     widgetType: 1, // Pie chart
@@ -119,6 +126,12 @@ WHERE t.TstatusType = 1
     AND f.Fdeleted = f.fmergedintofaultid
 GROUP BY p.Pdesc`,
     fallbackReportName: 'Dashboard - Tickets by Priority',
+    // Chart config - MUST match SQL column aliases exactly
+    chartType: 2,  // 2=pie in HaloPSA
+    xAxis: 'Priority',
+    yAxis: 'Count',
+    xAxisCaption: 'Priority',
+    yAxisCaption: 'Count',
     filterId: null,
     ticketareaId: null,
     color: '#3498db',
@@ -139,6 +152,11 @@ WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
 GROUP BY t.tstatusdesc`,
     fallbackReportName: 'Dashboard - Tickets by Status',
+    chartType: 2,  // 2=pie
+    xAxis: 'Status',
+    yAxis: 'Count',
+    xAxisCaption: 'Status',
+    yAxisCaption: 'Count',
     filterId: null,
     ticketareaId: null,
     color: '#9b59b6',
@@ -157,8 +175,14 @@ FROM FAULTS f
 LEFT JOIN AREA a ON f.Areaint = a.Aarea
 WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
-GROUP BY a.aareadesc`,
+GROUP BY a.aareadesc
+ORDER BY COUNT(*) DESC`,
     fallbackReportName: 'Dashboard - Tickets by Client',
+    chartType: 2,  // 2=pie
+    xAxis: 'Client',
+    yAxis: 'Count',
+    xAxisCaption: 'Client',
+    yAxisCaption: 'Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#e74c3c',
@@ -176,8 +200,14 @@ GROUP BY a.aareadesc`,
 FROM FAULTS f
 WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
-GROUP BY f.category2`,
+GROUP BY f.category2
+ORDER BY COUNT(*) DESC`,
     fallbackReportName: 'Dashboard - Tickets by Category',
+    chartType: 2,  // 2=pie
+    xAxis: 'Category',
+    yAxis: 'Count',
+    xAxisCaption: 'Category',
+    yAxisCaption: 'Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#2ecc71',
@@ -197,7 +227,13 @@ LEFT JOIN UNAME u ON f.Assignedtoint = u.Unum
 JOIN TSTATUS t ON f.Status = t.Tstatus
 WHERE t.TstatusType = 1
     AND f.Fdeleted = f.fmergedintofaultid
-GROUP BY u.uname`,
+GROUP BY u.uname
+ORDER BY COUNT(*) DESC`,
+    chartType: 0,  // 0=bar
+    xAxis: 'Agent',
+    yAxis: 'Open Tickets',
+    xAxisCaption: 'Agent',
+    yAxisCaption: 'Open Tickets',
     fallbackReportName: 'Dashboard - Agent Workload',
     filterId: null,
     ticketareaId: null,
@@ -219,6 +255,11 @@ WHERE f.datecleared >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
 GROUP BY u.uname`,
     fallbackReportName: 'Dashboard - Tickets Closed by Agent',
+    chartType: 0,  // 0=bar
+    xAxis: 'Agent',
+    yAxis: 'Closed Tickets',
+    xAxisCaption: 'Agent',
+    yAxisCaption: 'Closed Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#1abc9c',
@@ -236,8 +277,14 @@ GROUP BY u.uname`,
 FROM FAULTS f
 WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
-GROUP BY CONVERT(varchar, f.dateoccured, 23)`,
+GROUP BY CONVERT(varchar, f.dateoccured, 23)
+ORDER BY CONVERT(varchar, f.dateoccured, 23)`,
     fallbackReportName: 'Dashboard - Tickets Over Time',
+    chartType: 1,  // 1=line chart (better for time series)
+    xAxis: 'Date',
+    yAxis: 'Ticket Count',
+    xAxisCaption: 'Date',
+    yAxisCaption: 'Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#34495e',
@@ -270,6 +317,11 @@ GROUP BY
         ELSE 'Pending'
     END`,
     fallbackReportName: 'Dashboard - SLA Performance',
+    chartType: 2,  // 2=pie
+    xAxis: 'SLA Status',
+    yAxis: 'Count',
+    xAxisCaption: 'SLA Status',
+    yAxisCaption: 'Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#e67e22',
@@ -305,8 +357,14 @@ WHERE f.FResponseDate IS NOT NULL
 FROM FAULTS f
 WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
     AND f.Fdeleted = f.fmergedintofaultid
-GROUP BY f.Username`,
+GROUP BY f.Username
+ORDER BY COUNT(*) DESC`,
     fallbackReportName: 'Dashboard - Top Callers',
+    chartType: 2,  // 2=pie
+    xAxis: 'Caller',
+    yAxis: 'Ticket Count',
+    xAxisCaption: 'Caller',
+    yAxisCaption: 'Tickets',
     filterId: null,
     ticketareaId: null,
     color: '#8e44ad',
@@ -517,6 +575,9 @@ export class DashboardBuilderService {
 
   /**
    * Create a report for a widget template.
+   *
+   * IMPORTANT: This method now passes chart configuration (chartType, xAxis, yAxis)
+   * to createCustomReport. Without these, charts will not display data.
    */
   async createReportForWidget(template: WidgetTemplate): Promise<Report | null> {
     if (!template.fallbackSql || !template.fallbackReportName) {
@@ -525,13 +586,31 @@ export class DashboardBuilderService {
     }
 
     try {
-      const report = await this.reportService.createCustomReport({
+      // Build report options including chart configuration
+      const reportOptions: Parameters<typeof this.reportService.createCustomReport>[0] = {
         name: template.fallbackReportName,
         sqlQuery: template.fallbackSql.trim(),
         description: `Auto-created for dashboard widget: ${template.name}`,
         category: 'Dashboard',
         isShared: true,
-      });
+      };
+
+      // Add chart configuration if this is a chart widget
+      // Widget types 0, 1, 2 are report-based and need chart config
+      if ([0, 1, 2].includes(template.widgetType) && template.chartType !== undefined) {
+        reportOptions.chartType = template.chartType;
+        reportOptions.xAxis = template.xAxis;
+        reportOptions.yAxis = template.yAxis;
+        reportOptions.xAxisCaption = template.xAxisCaption;
+        reportOptions.yAxisCaption = template.yAxisCaption;
+        reportOptions.chartTitle = template.name;
+        reportOptions.count = true;
+        reportOptions.showGraphValues = true;
+
+        console.log(`[DashboardBuilder] Creating chart report with config: chartType=${template.chartType}, xAxis='${template.xAxis}', yAxis='${template.yAxis}'`);
+      }
+
+      const report = await this.reportService.createCustomReport(reportOptions);
       console.log(`[DashboardBuilder] Created report '${report.name}' (ID: ${report.id})`);
       // Refresh cache
       this.reportCache = null;

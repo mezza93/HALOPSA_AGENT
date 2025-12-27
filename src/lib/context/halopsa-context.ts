@@ -237,18 +237,45 @@ export const HALOPSA_VARIABLES = `## HaloPSA Template Variables
 export const DASHBOARD_CONTEXT = `## HaloPSA Dashboard & Reporting
 
 ### Dashboard Widget Types
-1. **Type 0** - Bar/Line Chart (requires report_id)
-2. **Type 1** - Pie/Doughnut Chart (requires report_id)
-3. **Type 2** - Counter from Report (requires report_id)
-4. **Type 6** - List Widget (requires filter_id)
-5. **Type 7** - Counter from Filter (requires filter_id + ticketarea_id)
+| Type | Name | Requires | Use For |
+|------|------|----------|---------|
+| 0 | Bar Chart | report_id | Comparisons (agent workload, tickets by status) |
+| 1 | Pie Chart | report_id | Proportions (priority distribution, category breakdown) |
+| 2 | Counter (Report) | report_id | Single metrics from SQL (avg response time) |
+| 6 | List Widget | filter_id | Ticket lists |
+| 7 | Counter (Filter) | filter_id + ticketarea_id | Ticket counts (open tickets, unassigned) |
+
+### CRITICAL: Chart Report Configuration
+For charts to display properly, reports MUST have these fields set:
+- **charttype**: 0=bar, 1=line, 2=pie, 3=doughnut
+- **xaxis**: Column name from SQL for X-axis (e.g., 'Priority', 'Agent', 'Status')
+- **yaxis**: Column name from SQL for Y-axis (e.g., 'Count', 'Open Tickets')
+- **count**: true (to enable counting mode)
+- **showgraphvalues**: true (to display values on chart)
+
+**IMPORTANT**: The xaxis and yaxis values MUST exactly match the column aliases in your SQL query.
+
+### SQL for Charts - Required Format
+Charts require exactly 2 columns: a label and a count.
+
+**Correct Example:**
+\`\`\`sql
+SELECT TOP 100
+    COALESCE(p.Pdesc, 'No Priority') AS [Priority],  -- xaxis='Priority'
+    COUNT(*) AS [Count]                               -- yaxis='Count'
+FROM FAULTS f
+LEFT JOIN POLICY p ON f.seriousness = p.Ppolicy
+GROUP BY p.Pdesc
+\`\`\`
 
 ### Smart Dashboard Layouts Available
-- service_desk: Open tickets, unassigned, SLA hold, closed today, priority chart, agent workload
-- management: Priority, status, agent workload, SLA performance, tickets over time
-- sla_focused: SLA metrics, response times, priority breakdown
-- client_focused: Client breakdown, top callers, categories
-- minimal: Just the essentials (open, unassigned, priority, workload)
+| Layout | Widgets | Best For |
+|--------|---------|----------|
+| service_desk | Open/unassigned counters, priority chart, agent workload | Daily operations |
+| management | Status, trends, SLA performance, agent metrics | Manager oversight |
+| sla_focused | SLA counters, response times, priority breakdown | SLA monitoring |
+| client_focused | Client breakdown, top callers, categories | Account management |
+| minimal | Open, unassigned, priority, workload | Quick overview |
 
 ### Common Dashboard Metrics
 - Open tickets by status/priority/team
@@ -256,21 +283,12 @@ export const DASHBOARD_CONTEXT = `## HaloPSA Dashboard & Reporting
 - Average response/resolution time
 - Tickets opened vs closed trend
 - Agent workload distribution
-- Customer satisfaction scores
-- Revenue and billable hours
 
 ### Report Types
 1. **Standard Reports** - Pre-built reports
-2. **Custom SQL Reports** - Write your own SQL (use Request_View)
+2. **Custom SQL Reports** - Write your own SQL (use Request_View for simplicity)
 3. **Scheduled Reports** - Auto-email reports
 4. **Export Formats** - PDF, Excel, CSV
-
-### Filtering Options
-- Date range (@startdate, @enddate)
-- Client/Site
-- Agent/Team
-- Ticket type/status/priority
-- Category
 `;
 
 /**
@@ -422,12 +440,31 @@ ${DASHBOARD_CONTEXT}
 
 ${API_REFERENCE}
 
-### Tips for Creating Reports and Dashboards
-- ALWAYS use Request_View for simple dashboard reports - it has pre-joined data
-- ALWAYS include TOP N clause when using GROUP BY to satisfy SQL Server requirements
-- Use [square brackets] for column names with spaces
-- For chart widgets, a valid report_id is required
-- For counter widgets, you can use filter_id with ticketarea_id=1 (Tickets)
-- Use smartBuildDashboard for automatic dashboard creation with pre-configured widgets
+## Critical Tips for Success
+
+### Dashboard & Chart Creation
+1. **Use smartBuildDashboard tool** - It handles report creation with proper chart config automatically
+2. **Chart reports MUST have**: charttype, xaxis, yaxis (matching SQL column aliases exactly)
+3. **Counter widgets (type 7)**: Use filter_id + ticketarea_id=1 (for tickets)
+4. **Chart widgets (type 0, 1)**: Require valid report_id with chart configuration
+
+### SQL Query Best Practices
+1. ALWAYS include TOP N clause with ORDER BY or GROUP BY
+2. Use [square brackets] for column names with spaces
+3. For charts: Return exactly 2 columns - label and count
+4. Column aliases MUST match xaxis/yaxis values exactly
+5. Use Request_View for simple reports - has pre-joined readable columns
+
+### Common Patterns
+- Open tickets: TstatusType = 1 or Status NOT IN (closed status IDs)
+- Non-deleted tickets: Fdeleted = fmergedintofaultid (NOT fdeleted = 0)
+- Priority lookup: JOIN POLICY p ON f.seriousness = p.Ppolicy
+- Agent lookup: JOIN UNAME u ON f.Assignedtoint = u.Unum
+- Client lookup: JOIN AREA a ON f.Areaint = a.Aarea
+
+### Error Handling
+- If a widget shows no data, check if the report has charttype, xaxis, yaxis configured
+- If report creation fails, check SQL syntax (TOP clause, brackets, valid JOINs)
+- For filter-based counters, ensure filter_id and ticketarea_id are both > 0
 `;
 }

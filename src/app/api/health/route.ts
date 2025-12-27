@@ -1,54 +1,88 @@
 /**
  * Health check endpoint for debugging and monitoring.
- * GET /api/health - Returns system status
+ * GET /api/health - Returns system status (requires admin authentication)
+ *
+ * SECURITY: This endpoint requires admin authentication to prevent
+ * information disclosure about system configuration.
  */
 
-import { auth } from '@/lib/auth';
+import { auth, isAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function GET() {
-  const checks: Record<string, { status: 'ok' | 'error' | 'missing'; message?: string }> = {};
+  // Check authentication - require admin for detailed checks
+  const session = await auth();
+  const isAuthenticated = !!session?.user;
+  const hasAdminAccess = isAdmin(session?.user?.role);
 
-  // Check environment variables
+  // For unauthenticated requests, return minimal health info
+  if (!isAuthenticated) {
+    return new Response(
+      JSON.stringify({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  // For authenticated non-admin users, return basic status
+  if (!hasAdminAccess) {
+    let dbStatus = 'ok';
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch {
+      dbStatus = 'error';
+    }
+
+    return new Response(
+      JSON.stringify({
+        status: dbStatus === 'ok' ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        checks: {
+          database: { status: dbStatus },
+          auth: { status: 'ok' },
+        },
+      }),
+      {
+        status: dbStatus === 'ok' ? 200 : 503,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  // Admin-only: Full health check with detailed status
+  const checks: Record<string, { status: 'ok' | 'error' | 'missing' }> = {};
+
+  // Check environment variables (without exposing values)
   checks.anthropic_api_key = process.env.ANTHROPIC_API_KEY
     ? { status: 'ok' }
-    : { status: 'missing', message: 'ANTHROPIC_API_KEY not set' };
+    : { status: 'missing' };
 
   checks.encryption_key = process.env.ENCRYPTION_KEY
     ? { status: 'ok' }
-    : { status: 'missing', message: 'ENCRYPTION_KEY not set' };
+    : { status: 'missing' };
 
   checks.database_url = process.env.DATABASE_URL
     ? { status: 'ok' }
-    : { status: 'missing', message: 'DATABASE_URL not set' };
+    : { status: 'missing' };
 
   checks.auth_secret = (process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET)
     ? { status: 'ok' }
-    : { status: 'missing', message: 'AUTH_SECRET/NEXTAUTH_SECRET not set' };
+    : { status: 'missing' };
 
   // Check database connection
   try {
     await prisma.$queryRaw`SELECT 1`;
     checks.database_connection = { status: 'ok' };
-  } catch (error) {
-    checks.database_connection = {
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown database error',
-    };
+  } catch {
+    checks.database_connection = { status: 'error' };
   }
 
-  // Check authentication
-  try {
-    const session = await auth();
-    checks.auth = session?.user
-      ? { status: 'ok', message: `Authenticated as ${session.user.email}` }
-      : { status: 'ok', message: 'Not authenticated (anonymous request)' };
-  } catch (error) {
-    checks.auth = {
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Auth check failed',
-    };
-  }
+  checks.auth = { status: 'ok' };
 
   // Overall status
   const hasErrors = Object.values(checks).some(c => c.status === 'error');

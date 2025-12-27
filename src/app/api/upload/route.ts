@@ -7,15 +7,46 @@ import { randomUUID } from 'crypto';
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// Allowed MIME types
-const ALLOWED_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-];
+// SECURITY: Whitelist of allowed MIME types and their safe extensions
+const ALLOWED_TYPES: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+};
+
+// SECURITY: Validate extension is safe and matches MIME type
+function getSecureExtension(mimeType: string, originalFileName: string): string | null {
+  // Get allowed extension for this MIME type
+  const allowedExt = ALLOWED_TYPES[mimeType];
+  if (!allowedExt) {
+    return null;
+  }
+
+  // Get the original extension (last part after final dot)
+  const originalExt = originalFileName.split('.').pop()?.toLowerCase();
+
+  // For JPEG, allow both .jpg and .jpeg
+  if (mimeType === 'image/jpeg' && (originalExt === 'jpg' || originalExt === 'jpeg')) {
+    return allowedExt;
+  }
+
+  // Verify extension matches MIME type
+  if (originalExt !== allowedExt) {
+    // Extension doesn't match - use the MIME type's safe extension
+    return allowedExt;
+  }
+
+  return allowedExt;
+}
+
+// SECURITY: Validate filename doesn't contain path traversal
+function sanitizeFileName(name: string): string {
+  // Remove any path separators and null bytes
+  return name.replace(/[\\/\0]/g, '_').replace(/\.\./g, '_');
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,20 +71,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Validate file type against whitelist
+    if (!ALLOWED_TYPES[file.type]) {
       return NextResponse.json(
-        { error: 'File type not allowed' },
+        { error: 'File type not allowed. Allowed types: PNG, JPEG, GIF, WebP, PDF, TXT.' },
         { status: 400 }
       );
     }
 
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop() || 'bin';
-    const fileName = `${randomUUID()}.${fileExt}`;
+    // SECURITY: Get a safe extension based on MIME type
+    const safeFileName = sanitizeFileName(file.name);
+    const safeExtension = getSecureExtension(file.type, safeFileName);
+
+    if (!safeExtension) {
+      return NextResponse.json(
+        { error: 'Invalid file type' },
+        { status: 400 }
+      );
+    }
+
+    // Generate unique filename with safe extension
+    const fileName = `${randomUUID()}.${safeExtension}`;
+
+    // SECURITY: Validate user ID to prevent path traversal
+    const userId = session.user.id.replace(/[^a-zA-Z0-9-_]/g, '');
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', session.user.id);
+    const uploadsDir = join(process.cwd(), 'public', 'uploads', userId);
     await mkdir(uploadsDir, { recursive: true });
 
     // Save file
@@ -62,7 +106,7 @@ export async function POST(req: NextRequest) {
     await writeFile(filePath, Buffer.from(bytes));
 
     // Return file info
-    const fileUrl = `/uploads/${session.user.id}/${fileName}`;
+    const fileUrl = `/uploads/${userId}/${fileName}`;
 
     return NextResponse.json({
       success: true,

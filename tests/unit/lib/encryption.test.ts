@@ -1,11 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock the encryption key
-vi.stubEnv('ENCRYPTION_KEY', 'a'.repeat(64)); // 32-byte hex key
+// Test key - 32-byte hex key
+const TEST_ENCRYPTION_KEY = 'a'.repeat(64);
 
 describe('Encryption Utilities', () => {
   beforeEach(() => {
     vi.resetModules();
+    // Ensure key is set before each test
+    vi.stubEnv('ENCRYPTION_KEY', TEST_ENCRYPTION_KEY);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('encrypts and decrypts a string correctly', async () => {
