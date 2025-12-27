@@ -26,8 +26,12 @@ import { createReportTools } from './reports';
 import { createConfigurationTools } from './configuration';
 import { createAttachmentTools } from './attachments';
 import { createDashboardBuilderTools } from './dashboard-builder';
+import { createDashboardValidatorTools } from './dashboard-validator';
+import { createReportRepositoryTools } from './report-repository';
+import { createWebResourceTools } from './web-resources';
 
 export { createHaloContext, type HaloContext } from './context';
+export { createWebResourceTools } from './web-resources';
 
 /**
  * Create all HaloPSA tools for the AI agent.
@@ -45,6 +49,10 @@ export function createHaloTools(ctx: HaloContext): Record<string, CoreTool> {
     ...createConfigurationTools(ctx),
     ...createAttachmentTools(ctx),
     ...createDashboardBuilderTools(ctx),
+    ...createDashboardValidatorTools(ctx),
+    ...createReportRepositoryTools(ctx),
+    // Web resource tools (no HaloContext required)
+    ...createWebResourceTools(),
   };
 }
 
@@ -214,6 +222,25 @@ export function getToolNames(): string[] {
     'suggestDashboardWidgets',
     'listDashboardTemplates',
     'findReportForWidget',
+    // Dashboard validator tools
+    'validateDashboard',
+    'validateReport',
+    'fixReport',
+    'createValidatedReport',
+    'listValidatedTemplates',
+    'getValidatedSql',
+    // Report repository tools
+    'listRepositoryReports',
+    'searchRepositoryReports',
+    'getRepositoryReport',
+    'importRepositoryReport',
+    'getRepositoryCategories',
+    'findAndImportReport',
+    // Web resource tools
+    'fetchHaloPSADocs',
+    'searchHaloPSAReddit',
+    'fetchContext7Docs',
+    'fetchWebPage',
   ];
 }
 
@@ -341,6 +368,20 @@ export const toolCategories = {
     'suggestDashboardWidgets',
     'listDashboardTemplates',
     'findReportForWidget',
+    // Dashboard validation
+    'validateDashboard',
+    'validateReport',
+    'fixReport',
+    'createValidatedReport',
+    'listValidatedTemplates',
+    'getValidatedSql',
+    // Report repository
+    'listRepositoryReports',
+    'searchRepositoryReports',
+    'getRepositoryReport',
+    'importRepositoryReport',
+    'getRepositoryCategories',
+    'findAndImportReport',
   ],
   configuration: [
     'listCustomFields',
@@ -378,5 +419,11 @@ export const toolCategories = {
     'deleteAttachment',
     'copyAttachments',
     'uploadAttachment',
+  ],
+  webResources: [
+    'fetchHaloPSADocs',
+    'searchHaloPSAReddit',
+    'fetchContext7Docs',
+    'fetchWebPage',
   ],
 } as const;

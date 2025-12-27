@@ -481,3 +481,287 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
     return { id: 0, name, isShared: false };
   }
 }
+
+/**
+ * Repository report from HaloPSA's online repository.
+ * These are pre-built, tested reports that can be imported.
+ */
+export interface RepositoryReport {
+  id: number;
+  name: string;
+  description?: string;
+  sql?: string;
+  chartType?: number;
+  category?: string;
+  isPublished?: boolean;
+  publishedId?: string;
+  systemReportId?: number;
+  isBuiltIn?: boolean;
+  xAxis?: string;
+  yAxis?: string;
+  chartTitle?: string;
+}
+
+/**
+ * API response for repository reports.
+ */
+interface RepositoryReportApiResponse {
+  id?: number;
+  name?: string;
+  title?: string;
+  description?: string;
+  sql?: string;
+  _sql?: string;
+  chart_type?: number;
+  charttype?: number;
+  category?: string;
+  group_id?: number;
+  is_published?: boolean;
+  published_id?: string;
+  systemreportid?: number;
+  builtinid?: boolean;
+  xaxis?: string;
+  yaxis?: string;
+  charttitle?: string;
+}
+
+/**
+ * Transform API response to RepositoryReport.
+ */
+function transformRepositoryReport(data: RepositoryReportApiResponse): RepositoryReport {
+  return {
+    id: data.id ?? 0,
+    name: data.name ?? data.title ?? '',
+    description: data.description,
+    sql: data.sql ?? data._sql,
+    chartType: data.chart_type ?? data.charttype,
+    category: data.category,
+    isPublished: data.is_published,
+    publishedId: data.published_id,
+    systemReportId: data.systemreportid,
+    isBuiltIn: data.builtinid,
+    xAxis: data.xaxis,
+    yAxis: data.yaxis,
+    chartTitle: data.charttitle,
+  };
+}
+
+/**
+ * Service for accessing HaloPSA's online report repository.
+ *
+ * The Report Repository contains pre-built, tested reports that are
+ * guaranteed to work with the HaloPSA database schema. This is much
+ * more reliable than creating custom SQL reports.
+ *
+ * Key endpoints:
+ * - GET /ReportRepository - List available reports
+ * - GET /ReportRepository/{id} - Get specific report details
+ * - GET /ReportRepository/ReportCategories - List report categories
+ */
+export class ReportRepositoryService {
+  private client: HaloPSAClient;
+  private endpoint = '/ReportRepository';
+
+  constructor(client: HaloPSAClient) {
+    this.client = client;
+  }
+
+  /**
+   * List all available reports from the HaloPSA repository.
+   *
+   * @param options - Query options
+   * @param options.includepublished - Include published/shared reports (default: true)
+   * @param options.chartonly - Only return reports suitable for charts (default: false)
+   * @param options.search - Search for specific reports by name/description
+   * @param options.reportgroup_id - Filter by report group
+   * @param options.count - Max number of reports to return
+   */
+  async list(options: {
+    includepublished?: boolean;
+    chartonly?: boolean;
+    search?: string;
+    reportgroup_id?: number;
+    count?: number;
+    type?: number;
+  } = {}): Promise<RepositoryReport[]> {
+    const params: Record<string, string | number | boolean> = {
+      includepublished: options.includepublished ?? true,
+    };
+
+    if (options.chartonly !== undefined) params.chartonly = options.chartonly;
+    if (options.search) params.search = options.search;
+    if (options.reportgroup_id) params.reportgroup_id = options.reportgroup_id;
+    if (options.count) params.count = options.count;
+    if (options.type !== undefined) params.type = options.type;
+
+    const response = await this.client.get<RepositoryReportApiResponse[] | { reports?: RepositoryReportApiResponse[] }>(
+      this.endpoint,
+      params
+    );
+
+    let reports: RepositoryReportApiResponse[] = [];
+    if (Array.isArray(response)) {
+      reports = response;
+    } else if (response && typeof response === 'object' && 'reports' in response && Array.isArray(response.reports)) {
+      reports = response.reports;
+    }
+
+    return reports.map(transformRepositoryReport);
+  }
+
+  /**
+   * List reports suitable for dashboard charts.
+   * These reports have SQL that produces chart-friendly output.
+   */
+  async listChartReports(options: {
+    search?: string;
+    count?: number;
+  } = {}): Promise<RepositoryReport[]> {
+    return this.list({
+      includepublished: true,
+      chartonly: true,
+      search: options.search,
+      count: options.count ?? 100,
+    });
+  }
+
+  /**
+   * Search for reports in the repository.
+   */
+  async search(query: string, options: {
+    chartonly?: boolean;
+    count?: number;
+  } = {}): Promise<RepositoryReport[]> {
+    return this.list({
+      includepublished: true,
+      search: query,
+      chartonly: options.chartonly,
+      count: options.count ?? 50,
+    });
+  }
+
+  /**
+   * Get a specific report from the repository by ID.
+   *
+   * @param id - Repository report ID
+   * @param options - Additional options
+   * @param options.includedetails - Include full report details including SQL
+   */
+  async get(id: number, options: {
+    includedetails?: boolean;
+    loadreport?: boolean;
+  } = {}): Promise<RepositoryReport> {
+    const params: Record<string, string | boolean> = {};
+    if (options.includedetails !== undefined) params.includedetails = options.includedetails;
+    if (options.loadreport !== undefined) params.loadreport = options.loadreport;
+
+    const response = await this.client.get<RepositoryReportApiResponse>(
+      `${this.endpoint}/${id}`,
+      params
+    );
+
+    return transformRepositoryReport(response);
+  }
+
+  /**
+   * Get report categories from the repository.
+   */
+  async getCategories(): Promise<Array<{ id: number; name: string }>> {
+    const response = await this.client.get<Array<{ id?: number; name?: string; value?: string }>>(
+      `${this.endpoint}/ReportCategories`
+    );
+
+    if (Array.isArray(response)) {
+      return response.map(c => ({
+        id: c.id ?? 0,
+        name: c.name ?? c.value ?? '',
+      }));
+    }
+
+    return [];
+  }
+
+  /**
+   * Import a report from the repository into your HaloPSA instance.
+   *
+   * This fetches the report configuration from the repository and creates
+   * a local copy that can be used for dashboards.
+   *
+   * @param repositoryReportId - The ID of the report in the repository
+   * @param reportService - The ReportService to use for creating the local report
+   * @param options - Import options
+   */
+  async importReport(
+    repositoryReportId: number,
+    reportService: ReportService,
+    options: {
+      name?: string; // Override the report name
+      isShared?: boolean;
+    } = {}
+  ): Promise<Report> {
+    // Fetch the full report from the repository
+    const repoReport = await this.get(repositoryReportId, { includedetails: true, loadreport: true });
+
+    if (!repoReport.sql) {
+      throw new Error(`Repository report ${repositoryReportId} does not have SQL - cannot import.`);
+    }
+
+    // Create a local copy of the report
+    const localReport = await reportService.createCustomReport({
+      name: options.name ?? repoReport.name ?? `Imported Report ${repositoryReportId}`,
+      sqlQuery: repoReport.sql,
+      description: repoReport.description ?? `Imported from HaloPSA Report Repository (ID: ${repositoryReportId})`,
+      category: repoReport.category ?? 'Imported',
+      isShared: options.isShared ?? true,
+    });
+
+    console.log(`[ReportRepository] Imported report '${localReport.name}' (ID: ${localReport.id}) from repository ID ${repositoryReportId}`);
+
+    return localReport;
+  }
+
+  /**
+   * Find a repository report by keywords and optionally import it.
+   *
+   * @param keywords - Keywords to search for (e.g., "priority", "status", "agent workload")
+   * @param options - Search and import options
+   */
+  async findAndImport(
+    keywords: string[],
+    reportService: ReportService,
+    options: {
+      chartonly?: boolean;
+      namePrefix?: string;
+      isShared?: boolean;
+    } = {}
+  ): Promise<Report | null> {
+    // Search for matching reports
+    for (const keyword of keywords) {
+      const results = await this.search(keyword, {
+        chartonly: options.chartonly ?? true,
+        count: 10,
+      });
+
+      // Find the best match
+      for (const result of results) {
+        // Score based on name matching
+        const nameLower = (result.name || '').toLowerCase();
+        const keywordLower = keyword.toLowerCase();
+
+        if (nameLower.includes(keywordLower) || keywordLower.includes(nameLower)) {
+          // Import this report
+          const imported = await this.importReport(result.id, reportService, {
+            name: options.namePrefix
+              ? `${options.namePrefix} - ${result.name}`
+              : result.name,
+            isShared: options.isShared ?? true,
+          });
+
+          return imported;
+        }
+      }
+    }
+
+    return null;
+  }
+}

@@ -3,9 +3,11 @@
  * Provides service instances for tool execution.
  */
 
-import { createHaloServices } from '@/lib/halopsa';
+import { createHaloServices, HaloPSAClient } from '@/lib/halopsa';
+import { ReportRepositoryService } from '@/lib/halopsa/services/reports';
 
 export interface HaloContext {
+  client: HaloPSAClient;
   tickets: ReturnType<typeof createHaloServices>['tickets'];
   clients: ReturnType<typeof createHaloServices>['clients'];
   agents: ReturnType<typeof createHaloServices>['agents'];
@@ -19,6 +21,7 @@ export interface HaloContext {
   reports: ReturnType<typeof createHaloServices>['reports'];
   configuration: ReturnType<typeof createHaloServices>['configuration'];
   attachments: ReturnType<typeof createHaloServices>['attachments'];
+  reportRepository: ReportRepositoryService;
 }
 
 /**
@@ -32,6 +35,7 @@ export function createHaloContext(config: {
 }): HaloContext {
   const services = createHaloServices(config);
   return {
+    client: services.client,
     tickets: services.tickets,
     clients: services.clients,
     agents: services.agents,
@@ -45,5 +49,6 @@ export function createHaloContext(config: {
     reports: services.reports,
     configuration: services.configuration,
     attachments: services.attachments,
+    reportRepository: new ReportRepositoryService(services.client),
   };
 }

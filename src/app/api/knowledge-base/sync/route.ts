@@ -431,3 +431,62 @@ async function upsertKBItem(
     result.itemsAdded++;
   }
 }
+
+/**
+ * GET endpoint to check sync status
+ */
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // Get last sync
+    const lastSync = await prisma.knowledgeBaseSync.findFirst({
+      where: { userId },
+      orderBy: { syncedAt: 'desc' },
+    });
+
+    // Get item counts by category
+    const itemCounts = await prisma.knowledgeBaseItem.groupBy({
+      by: ['category'],
+      where: { userId },
+      _count: true,
+    });
+
+    const totalItems = await prisma.knowledgeBaseItem.count({
+      where: { userId },
+    });
+
+    return NextResponse.json({
+      lastSync: lastSync ? {
+        id: lastSync.id,
+        status: lastSync.status,
+        syncType: lastSync.syncType,
+        itemsAdded: lastSync.itemsAdded,
+        itemsUpdated: lastSync.itemsUpdated,
+        itemsRemoved: lastSync.itemsRemoved,
+        errorCount: lastSync.errorCount,
+        errors: lastSync.errors,
+        syncedAt: lastSync.syncedAt,
+        completedAt: lastSync.completedAt,
+      } : null,
+      totalItems,
+      itemsByCategory: Object.fromEntries(
+        itemCounts.map(c => [c.category, c._count])
+      ),
+      needsSync: !lastSync ||
+        (lastSync.completedAt &&
+         new Date().getTime() - new Date(lastSync.completedAt).getTime() > 24 * 60 * 60 * 1000),
+    });
+  } catch (error) {
+    console.error('[KB Sync] Status error:', error);
+    return NextResponse.json(
+      { error: 'Failed to get sync status' },
+      { status: 500 }
+    );
+  }
+}

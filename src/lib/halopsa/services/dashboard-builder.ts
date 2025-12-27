@@ -1,9 +1,12 @@
 /**
  * Smart dashboard builder service with automatic report discovery and creation.
  * Ported from Python implementation.
+ *
+ * Now prioritizes HaloPSA's online Report Repository for pre-built, tested reports
+ * before falling back to custom SQL.
  */
 
-import { ReportService, DashboardService } from './reports';
+import { ReportService, DashboardService, ReportRepositoryService } from './reports';
 import type { Report, Dashboard } from '../types/reports';
 
 /**
@@ -28,6 +31,20 @@ interface WidgetTemplate {
 
 /**
  * Pre-defined widget templates for common dashboard needs.
+ *
+ * SQL queries use proven HaloPSA table/column names from working deployments:
+ * - FAULTS: Main tickets table (faultid, Status, Areaint, Assignedtoint, dateoccured, etc.)
+ * - TSTATUS: Status lookup (Tstatus, tstatusdesc, TstatusType: 1=open, 2/3=closed)
+ * - AREA: Client/Area lookup (Aarea, aareadesc)
+ * - UNAME: Agent/User lookup (Unum, uname)
+ * - POLICY: Priority lookup (Ppolicy, Pdesc) - Note: NOT PRIORITY table
+ *
+ * Key patterns from working SQL:
+ * - Use `Fdeleted = fmergedintofaultid` for non-deleted tickets (NOT fdeleted = 0)
+ * - Use `seriousness` column for priority (links to POLICY.Ppolicy)
+ * - Use TstatusType = 1 for open, 2/3 for closed
+ * - SLA columns: slastate, slaresponsestate ('I' = in SLA, 'O' = out/missed)
+ * - Response time: FResponseTime column
  */
 export const WIDGET_TEMPLATES: Record<string, WidgetTemplate> = {
   // Counter widgets (filter-based, type 7)
@@ -85,20 +102,22 @@ export const WIDGET_TEMPLATES: Record<string, WidgetTemplate> = {
   },
 
   // Chart widgets (report-based, types 0, 1)
-  // Note: Using Request_View which is a pre-joined view with readable column names
-  // Column names with spaces must be quoted with [ ]
-  // ORDER BY requires TOP in subqueries for SQL Server
+  // Using proven HaloPSA table/column names with proper JOINs
+  // Key: Use Fdeleted = fmergedintofaultid for non-deleted check
   tickets_by_priority: {
     name: 'Tickets by Priority',
     widgetType: 1, // Pie chart
     description: 'Pie chart showing ticket distribution by priority',
     reportKeywords: ['priority', 'tickets by priority', 'ticket priority'],
     fallbackSql: `SELECT TOP 100
-    COALESCE([Priority Description], 'No Priority') AS [Priority],
+    COALESCE(p.Pdesc, 'No Priority') AS [Priority],
     COUNT(*) AS [Count]
-FROM Request_View
-WHERE [Status ID] NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
-GROUP BY [Priority Description]`,
+FROM FAULTS f
+LEFT JOIN POLICY p ON f.seriousness = p.Ppolicy
+JOIN TSTATUS t ON f.Status = t.Tstatus
+WHERE t.TstatusType = 1
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY p.Pdesc`,
     fallbackReportName: 'Dashboard - Tickets by Priority',
     filterId: null,
     ticketareaId: null,
@@ -112,11 +131,13 @@ GROUP BY [Priority Description]`,
     description: 'Pie chart showing ticket distribution by status',
     reportKeywords: ['status', 'tickets by status', 'ticket status'],
     fallbackSql: `SELECT TOP 100
-    COALESCE([Status], 'Unknown') AS [Status],
+    t.tstatusdesc AS [Status],
     COUNT(*) AS [Count]
-FROM Request_View
-WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
-GROUP BY [Status]`,
+FROM FAULTS f
+JOIN TSTATUS t ON f.Status = t.Tstatus
+WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY t.tstatusdesc`,
     fallbackReportName: 'Dashboard - Tickets by Status',
     filterId: null,
     ticketareaId: null,
@@ -130,11 +151,13 @@ GROUP BY [Status]`,
     description: 'Pie chart showing tickets by client',
     reportKeywords: ['client', 'tickets by client', 'customer tickets', 'top clients'],
     fallbackSql: `SELECT TOP 10
-    COALESCE([Customer Name], 'No Client') AS [Client],
+    COALESCE(a.aareadesc, 'No Client') AS [Client],
     COUNT(*) AS [Count]
-FROM Request_View
-WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
-GROUP BY [Customer Name]`,
+FROM FAULTS f
+LEFT JOIN AREA a ON f.Areaint = a.Aarea
+WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY a.aareadesc`,
     fallbackReportName: 'Dashboard - Tickets by Client',
     filterId: null,
     ticketareaId: null,
@@ -148,11 +171,12 @@ GROUP BY [Customer Name]`,
     description: 'Pie chart showing tickets by category',
     reportKeywords: ['category', 'tickets by category', 'ticket categories'],
     fallbackSql: `SELECT TOP 100
-    COALESCE([Category], 'Uncategorized') AS [Category],
+    COALESCE(f.category2, 'Uncategorized') AS [Category],
     COUNT(*) AS [Count]
-FROM Request_View
-WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
-GROUP BY [Category]`,
+FROM FAULTS f
+WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY f.category2`,
     fallbackReportName: 'Dashboard - Tickets by Category',
     filterId: null,
     ticketareaId: null,
@@ -170,7 +194,9 @@ GROUP BY [Category]`,
     COUNT(*) AS [Open Tickets]
 FROM FAULTS f
 LEFT JOIN UNAME u ON f.Assignedtoint = u.Unum
-WHERE f.Status NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
+JOIN TSTATUS t ON f.Status = t.Tstatus
+WHERE t.TstatusType = 1
+    AND f.Fdeleted = f.fmergedintofaultid
 GROUP BY u.uname`,
     fallbackReportName: 'Dashboard - Agent Workload',
     filterId: null,
@@ -190,6 +216,7 @@ GROUP BY u.uname`,
 FROM FAULTS f
 JOIN UNAME u ON f.Clearwhoint = u.Unum
 WHERE f.datecleared >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
 GROUP BY u.uname`,
     fallbackReportName: 'Dashboard - Tickets Closed by Agent',
     filterId: null,
@@ -204,11 +231,12 @@ GROUP BY u.uname`,
     description: 'Chart showing ticket volume over time',
     reportKeywords: ['over time', 'daily tickets', 'weekly tickets', 'trend'],
     fallbackSql: `SELECT TOP 30
-    CONVERT(varchar, [Date Logged], 23) AS [Date],
+    CONVERT(varchar, f.dateoccured, 23) AS [Date],
     COUNT(*) AS [Ticket Count]
-FROM Request_View
-WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
-GROUP BY CONVERT(varchar, [Date Logged], 23)`,
+FROM FAULTS f
+WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY CONVERT(varchar, f.dateoccured, 23)`,
     fallbackReportName: 'Dashboard - Tickets Over Time',
     filterId: null,
     ticketareaId: null,
@@ -222,11 +250,25 @@ GROUP BY CONVERT(varchar, [Date Logged], 23)`,
     description: 'Pie chart showing SLA compliance',
     reportKeywords: ['sla', 'sla performance', 'sla breach', 'response time'],
     fallbackSql: `SELECT TOP 10
-    COALESCE([SLA Compliance], 'Unknown') AS [SLA Status],
+    CASE
+        WHEN f.slaresponsestate = 'I' AND f.slastate = 'I' THEN 'Fully Met'
+        WHEN f.slaresponsestate = 'O' OR f.slastate = 'O' THEN 'Missed'
+        WHEN f.FSLAonhold = 1 THEN 'On Hold'
+        ELSE 'Pending'
+    END AS [SLA Status],
     COUNT(*) AS [Count]
-FROM Request_View
-WHERE [Status ID] NOT IN (SELECT Tstatus FROM TSTATUS WHERE TstatusType IN (2, 3))
-GROUP BY [SLA Compliance]`,
+FROM FAULTS f
+JOIN TSTATUS t ON f.Status = t.Tstatus
+WHERE t.TstatusType = 1
+    AND f.FexcludefromSLA = 0
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY
+    CASE
+        WHEN f.slaresponsestate = 'I' AND f.slastate = 'I' THEN 'Fully Met'
+        WHEN f.slaresponsestate = 'O' OR f.slastate = 'O' THEN 'Missed'
+        WHEN f.FSLAonhold = 1 THEN 'On Hold'
+        ELSE 'Pending'
+    END`,
     fallbackReportName: 'Dashboard - SLA Performance',
     filterId: null,
     ticketareaId: null,
@@ -240,10 +282,11 @@ GROUP BY [SLA Compliance]`,
     description: 'Average first response time',
     reportKeywords: ['response time', 'first response', 'average response'],
     fallbackSql: `SELECT TOP 1
-    CAST(AVG([Response Time]) AS DECIMAL(10,1)) AS [Avg Response Hours]
-FROM Request_View
-WHERE [Response Date] IS NOT NULL
-    AND [Date Logged] >= DATEADD(day, -30, GETDATE())`,
+    ROUND(ISNULL(AVG(f.FResponseTime), 0), 2) AS [Avg Response Hours]
+FROM FAULTS f
+WHERE f.FResponseDate IS NOT NULL
+    AND f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid`,
     fallbackReportName: 'Dashboard - Avg Response Time',
     filterId: null,
     ticketareaId: null,
@@ -257,11 +300,12 @@ WHERE [Response Date] IS NOT NULL
     description: 'Top users submitting tickets',
     reportKeywords: ['caller', 'top callers', 'users', 'requesters'],
     fallbackSql: `SELECT TOP 10
-    COALESCE([User], 'Unknown') AS [Caller],
+    COALESCE(f.Username, 'Unknown') AS [Caller],
     COUNT(*) AS [Ticket Count]
-FROM Request_View
-WHERE [Date Logged] >= DATEADD(day, -30, GETDATE())
-GROUP BY [User]`,
+FROM FAULTS f
+WHERE f.dateoccured >= DATEADD(day, -30, GETDATE())
+    AND f.Fdeleted = f.fmergedintofaultid
+GROUP BY f.Username`,
     fallbackReportName: 'Dashboard - Top Callers',
     filterId: null,
     ticketareaId: null,
@@ -354,15 +398,41 @@ interface BuildResult {
 
 /**
  * Service for intelligently building dashboards with automatic report discovery/creation.
+ *
+ * Report sourcing priority:
+ * 1. HaloPSA Report Repository (pre-built, tested reports)
+ * 2. Existing local reports matching keywords
+ * 3. Custom SQL reports (fallback)
  */
 export class DashboardBuilderService {
   private reportService: ReportService;
   private dashboardService: DashboardService;
+  private repositoryService: ReportRepositoryService | null = null;
   private reportCache: Report[] | null = null;
+  private useRepository: boolean = true;
 
-  constructor(reportService: ReportService, dashboardService: DashboardService) {
+  constructor(
+    reportService: ReportService,
+    dashboardService: DashboardService,
+    repositoryService?: ReportRepositoryService
+  ) {
     this.reportService = reportService;
     this.dashboardService = dashboardService;
+    this.repositoryService = repositoryService ?? null;
+  }
+
+  /**
+   * Enable or disable using the HaloPSA Report Repository.
+   */
+  setUseRepository(enabled: boolean): void {
+    this.useRepository = enabled;
+  }
+
+  /**
+   * Set the repository service (if not provided in constructor).
+   */
+  setRepositoryService(service: ReportRepositoryService): void {
+    this.repositoryService = service;
   }
 
   /**
@@ -473,45 +543,117 @@ export class DashboardBuilderService {
   }
 
   /**
+   * Try to find and import a report from HaloPSA's online repository.
+   * Repository reports are pre-built and tested, so they're more reliable.
+   */
+  async tryImportFromRepository(template: WidgetTemplate): Promise<Report | null> {
+    if (!this.useRepository || !this.repositoryService) {
+      return null;
+    }
+
+    if (!template.reportKeywords || template.reportKeywords.length === 0) {
+      return null;
+    }
+
+    try {
+      console.log(`[DashboardBuilder] Searching HaloPSA Report Repository for: ${template.reportKeywords.join(', ')}`);
+
+      // Search for matching reports in the repository
+      for (const keyword of template.reportKeywords) {
+        const results = await this.repositoryService.search(keyword, {
+          chartonly: true,
+          count: 10,
+        });
+
+        if (results.length > 0) {
+          // Find the best match
+          for (const repoReport of results) {
+            const nameLower = (repoReport.name || '').toLowerCase();
+            const keywordLower = keyword.toLowerCase();
+
+            // Check for a reasonable match
+            if (nameLower.includes(keywordLower) ||
+                keywordLower.split(' ').some(word => nameLower.includes(word))) {
+              console.log(`[DashboardBuilder] Found matching repository report: ${repoReport.name} (ID: ${repoReport.id})`);
+
+              // Import the report
+              const imported = await this.repositoryService.importReport(
+                repoReport.id,
+                this.reportService,
+                {
+                  name: template.fallbackReportName ?? `Dashboard - ${repoReport.name}`,
+                  isShared: true,
+                }
+              );
+
+              console.log(`[DashboardBuilder] Imported repository report as ID: ${imported.id}`);
+              this.reportCache = null; // Clear cache
+              return imported;
+            }
+          }
+        }
+      }
+
+      console.log(`[DashboardBuilder] No matching repository reports found for: ${template.name}`);
+      return null;
+    } catch (error) {
+      console.warn(`[DashboardBuilder] Repository search failed, will use custom SQL:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get existing report or create new one for a widget template.
-   * If a "Dashboard - *" report exists, it will be deleted and recreated with fresh SQL.
+   *
+   * Priority:
+   * 1. Try HaloPSA Report Repository (pre-built, tested reports)
+   * 2. Fall back to custom SQL if repository not available or no match found
    */
   async getOrCreateReport(template: WidgetTemplate): Promise<number | null> {
-    // Check if we have our auto-created report that might have old/bad SQL
+    // ALWAYS delete any existing "Dashboard - *" reports with matching name
+    // This ensures we always use fresh reports
     const reports = await this.getAllReports();
     const dashboardReportName = template.fallbackReportName;
 
     if (dashboardReportName) {
-      // Look for existing auto-created dashboard report
-      const existingDashboardReport = reports.find(
-        r => r.name === dashboardReportName || r.name?.startsWith('Dashboard - ')
+      // Find ALL dashboard reports that might have old/bad SQL
+      const existingDashboardReports = reports.filter(
+        r => r.name === dashboardReportName ||
+             (r.name?.startsWith('Dashboard - ') &&
+              template.reportKeywords.some(kw =>
+                r.name?.toLowerCase().includes(kw.toLowerCase())
+              ))
       );
 
-      if (existingDashboardReport && existingDashboardReport.id) {
-        // Delete the old report and create a fresh one with updated SQL
-        console.log(`[DashboardBuilder] Found old dashboard report '${existingDashboardReport.name}' (ID: ${existingDashboardReport.id}), will create fresh report`);
-        try {
-          await this.reportService.delete(existingDashboardReport.id);
-          console.log(`[DashboardBuilder] Deleted old report ID: ${existingDashboardReport.id}`);
-          this.reportCache = null; // Clear cache
-        } catch (err) {
-          console.warn(`[DashboardBuilder] Could not delete old report: ${err}`);
-          // Continue anyway - we'll create a new one with a slightly different name
+      // Delete ALL matching old reports
+      for (const oldReport of existingDashboardReports) {
+        if (oldReport.id) {
+          console.log(`[DashboardBuilder] Deleting old report '${oldReport.name}' (ID: ${oldReport.id}) to use fresh report`);
+          try {
+            await this.reportService.delete(oldReport.id);
+            console.log(`[DashboardBuilder] Deleted old report ID: ${oldReport.id}`);
+          } catch (err) {
+            console.warn(`[DashboardBuilder] Could not delete old report ${oldReport.id}: ${err}`);
+          }
         }
       }
-    }
 
-    // Try to find a non-dashboard report that matches keywords
-    if (template.reportKeywords.length > 0) {
-      const existing = await this.findMatchingReport(template.reportKeywords);
-      // Only use if it's NOT a Dashboard auto-created report (which might have bad SQL)
-      if (existing && existing.id && !existing.name?.startsWith('Dashboard - ')) {
-        console.log(`[DashboardBuilder] Using existing report '${existing.name}' for ${template.name}`);
-        return existing.id;
+      // Clear cache after deletions
+      if (existingDashboardReports.length > 0) {
+        this.reportCache = null;
       }
     }
 
-    // Create new report with fresh SQL
+    // PRIORITY 1: Try HaloPSA Report Repository first
+    // Repository reports are pre-built and tested by HaloPSA
+    const repositoryReport = await this.tryImportFromRepository(template);
+    if (repositoryReport && repositoryReport.id) {
+      console.log(`[DashboardBuilder] Using repository report ID: ${repositoryReport.id}`);
+      return repositoryReport.id;
+    }
+
+    // PRIORITY 2: Fall back to custom SQL
+    console.log(`[DashboardBuilder] Creating custom SQL report for ${template.name}`);
     const newReport = await this.createReportForWidget(template);
     if (newReport && newReport.id) {
       return newReport.id;
