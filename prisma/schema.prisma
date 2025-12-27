@@ -43,12 +43,15 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts         Account[]
-  sessions         Session[]
-  connections      HaloConnection[]
-  chatSessions     ChatSession[]
-  auditLogs        AuditLog[]
-  automationRules  AutomationRule[]
+  accounts             Account[]
+  sessions             Session[]
+  connections          HaloConnection[]
+  chatSessions         ChatSession[]
+  auditLogs            AuditLog[]
+  automationRules      AutomationRule[]
+  conversationMemories ConversationMemory[]
+  notebookEntries      NotebookEntry[]
+  conversationSummaries ConversationSummary[]
 
   @@index([email])
   @@index([role])
@@ -177,6 +180,7 @@ model ChatSession {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection    HaloConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   messages      ChatMessage[]
+  summary       ConversationSummary?
 
   @@index([userId])
   @@index([connectionId])
@@ -508,4 +512,118 @@ enum ExecutionStatus {
   SUCCESS
   FAILED
   SKIPPED
+}
+
+// ===========================================
+// Conversation Memory & Context
+// ===========================================
+
+// Stores important context from conversations for cross-session memory
+model ConversationMemory {
+  id            String    @id @default(cuid())
+  userId        String
+
+  // Entity reference (what this memory is about)
+  entityType    EntityType        // client, ticket, agent, asset, etc.
+  entityId      String?           // HaloPSA ID if applicable
+  entityName    String            // Human-readable name
+
+  // Memory content
+  summary       String    @db.Text  // What was discussed/learned
+  keyFacts      Json?               // Structured facts about the entity
+  sentiment     String?             // positive, neutral, negative
+  importance    Int       @default(5) // 1-10 importance score
+
+  // Source tracking
+  sessionId     String?           // Which chat session this came from
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastAccessedAt DateTime @default(now())
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityName])
+  @@index([userId, entityType])
+  @@index([lastAccessedAt])
+}
+
+enum EntityType {
+  CLIENT
+  TICKET
+  AGENT
+  ASSET
+  CONTRACT
+  PROJECT
+  REPORT
+  GENERAL
+}
+
+// User's notebook for saving important findings
+model NotebookEntry {
+  id            String    @id @default(cuid())
+  userId        String
+
+  // Entry content
+  title         String              // Short title
+  content       String    @db.Text  // Full content (markdown supported)
+  category      String?             // User-defined category
+  tags          String[]            // Array of tags for searching
+
+  // Related entities
+  relatedEntities Json?             // Array of {type, id, name}
+
+  // Source tracking
+  sessionId     String?             // Which chat session this came from
+  messageExcerpt String?  @db.Text  // The AI response that was saved
+
+  // Organization
+  isPinned      Boolean   @default(false)
+  isArchived    Boolean   @default(false)
+  color         String?             // For visual organization
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@index([isPinned])
+  @@index([createdAt])
+}
+
+// Tracks conversation summaries for context continuity
+model ConversationSummary {
+  id            String    @id @default(cuid())
+  sessionId     String    @unique
+  userId        String
+
+  // Summary content
+  title         String              // Auto-generated title
+  summary       String    @db.Text  // Summary of the conversation
+  topics        String[]            // Main topics discussed
+  entitiesMentioned Json?           // Clients, tickets, etc. mentioned
+
+  // Key outcomes
+  actionsPerformed Json?            // What was created/updated
+  questionsAsked   Json?            // Key questions the user asked
+  insightsProvided Json?            // Key insights provided
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }

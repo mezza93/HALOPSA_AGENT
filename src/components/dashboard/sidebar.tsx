@@ -12,6 +12,7 @@ import {
   Sparkles,
   LogOut,
   BookOpen,
+  BookMarked,
   ChevronRight,
   Lightbulb,
 } from 'lucide-react';
@@ -33,9 +34,10 @@ interface SidebarProps {
 const navigation = [
   { name: 'Chat', href: '/chat', icon: MessageSquare, shortcut: '1', description: 'AI-powered assistant' },
   { name: 'History', href: '/chat/history', icon: History, shortcut: '2', description: 'Past conversations' },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, shortcut: '3', description: 'HaloPSA configuration' },
-  { name: 'Opportunities', href: '/opportunities', icon: Lightbulb, shortcut: '4', description: 'Optimization suggestions' },
-  { name: 'Settings', href: '/settings', icon: Settings, shortcut: '5', description: 'Account preferences' },
+  { name: 'Notebook', href: '/notebook', icon: BookMarked, shortcut: '3', description: 'Saved notes & context' },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, shortcut: '4', description: 'HaloPSA configuration' },
+  { name: 'Opportunities', href: '/opportunities', icon: Lightbulb, shortcut: '5', description: 'Optimization suggestions' },
+  { name: 'Settings', href: '/settings', icon: Settings, shortcut: '6', description: 'Account preferences' },
 ];
 
 const adminNavigation = [

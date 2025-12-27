@@ -3,7 +3,7 @@ import { streamText, type CoreTool } from 'ai';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/utils/encryption';
-import { createHaloToolsFromConfig, toolCategories, createAutomationTools } from '@/lib/ai/tools';
+import { createHaloToolsFromConfig, toolCategories, createAutomationTools, createMemoryTools, getMemoryContextForUser } from '@/lib/ai/tools';
 import { getHaloPSAContext } from '@/lib/context/halopsa-context';
 
 // Log environment check on startup (only in development)
@@ -40,6 +40,7 @@ You are a knowledgeable MSP operations expert who understands:
 **Configuration (${toolCategories.configuration.length} tools)** - System configuration
 **Attachments (${toolCategories.attachments.length} tools)** - File management
 **Automation (${toolCategories.automation.length} tools)** - Natural language automation rules
+**Memory (${toolCategories.memory.length} tools)** - Save notes, remember context across sessions
 
 ## ⚠️ MANDATORY: Confirmation Before ANY Write Operation
 
@@ -61,6 +62,7 @@ Before calling ANY tool that creates, updates, or deletes data in HaloPSA, you M
 - createAsset, updateAsset
 - createKbArticle, updateKbArticle
 - createAutomationRule, toggleAutomationRule, deleteAutomationRule
+- saveToNotebook, deleteNotebookEntry (memory tools)
 - ANY tool with "create", "update", "delete", "assign", "close" in the name
 
 **Example - Before creating a report:**
@@ -109,6 +111,12 @@ Before calling ANY tool that creates, updates, or deletes data in HaloPSA, you M
 **Client Queries:**
 - When asked about a client, provide ticket summary, active contracts, and any issues
 - Include recent activity and any outstanding SLA breaches
+
+**Memory & Notebook:**
+- Use rememberContext to automatically save important context about clients, tickets, or insights
+- When users ask to "save this" or "remember this", use saveToNotebook
+- Use recallContext to retrieve relevant past context when discussing a client or topic
+- Memory context is automatically loaded at the start of each conversation
 
 **Reporting & Custom SQL:**
 - CRITICAL: Before writing ANY custom SQL, call getSqlSchemaContext to get actual table/column names
@@ -256,7 +264,11 @@ export async function POST(req: Request) {
           const automationTools = createAutomationTools(session.user.id, connection.id);
           tools = { ...tools, ...automationTools };
 
-          console.log('[Chat API] Created', Object.keys(tools).length, 'HaloPSA tools (including automation)');
+          // Add memory tools (requires userId)
+          const memoryTools = createMemoryTools(session.user.id);
+          tools = { ...tools, ...memoryTools };
+
+          console.log('[Chat API] Created', Object.keys(tools).length, 'HaloPSA tools (including automation, memory)');
         }
       } catch (err) {
         console.error('[Chat API] Failed to decrypt credentials or create tools:', err);
@@ -302,11 +314,24 @@ export async function POST(req: Request) {
       }
     }
 
-    // If no connection or tools, add automation tools at minimum
+    // If no connection or tools, add automation and memory tools at minimum
     if (Object.keys(tools).length === 0) {
       connectionContext = '\n\nNo HaloPSA connection configured. Please set up a connection in Settings to use HaloPSA tools.';
-      // Still add automation tools for rule management
-      tools = createAutomationTools(session.user.id);
+      // Still add automation and memory tools for rule management and context
+      const automationTools = createAutomationTools(session.user.id);
+      const memoryTools = createMemoryTools(session.user.id);
+      tools = { ...automationTools, ...memoryTools };
+    }
+
+    // Load memory context for the user (recent context and relevant memories)
+    let memoryContext = '';
+    try {
+      memoryContext = await getMemoryContextForUser(session.user.id);
+      if (memoryContext) {
+        connectionContext += '\n\n' + memoryContext;
+      }
+    } catch (err) {
+      console.error('[Chat API] Failed to load memory context:', err);
     }
 
     // Get or create chat session

@@ -31,11 +31,13 @@ import { createReportRepositoryTools } from './report-repository';
 import { createWebResourceTools } from './web-resources';
 import { createSchemaTools } from './schema';
 import { createAutomationTools } from './automation';
+import { createMemoryTools, getMemoryContextForUser } from './memory';
 
 export { createHaloContext, type HaloContext } from './context';
 export { createWebResourceTools } from './web-resources';
 export { createSchemaTools } from './schema';
 export { createAutomationTools } from './automation';
+export { createMemoryTools, getMemoryContextForUser } from './memory';
 
 /**
  * Create all HaloPSA tools for the AI agent.
@@ -454,5 +456,15 @@ export const toolCategories = {
     'toggleAutomationRule',
     'deleteAutomationRule',
     'suggestAutomationRules',
+  ],
+  memory: [
+    'saveToNotebook',
+    'searchNotebook',
+    'getNotebookEntry',
+    'rememberContext',
+    'recallContext',
+    'getRecentContext',
+    'deleteNotebookEntry',
+    'toggleNotebookPin',
   ],
 } as const;
