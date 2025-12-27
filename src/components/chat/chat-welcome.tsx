@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles, Ticket, Users, BarChart3, HardDrive } from 'lucide-react';
+import { Sparkles, Ticket, HardDrive } from 'lucide-react';
 
 interface ChatWelcomeProps {
   onQuickAction: (action: string) => void;
@@ -12,18 +12,6 @@ const quickActions = [
     title: 'View Tickets',
     description: 'Show me open tickets',
     action: 'Show me all open tickets',
-  },
-  {
-    icon: Users,
-    title: 'Client Info',
-    description: 'List active clients',
-    action: 'List all active clients with their ticket counts',
-  },
-  {
-    icon: BarChart3,
-    title: 'SLA Report',
-    description: 'Check SLA performance',
-    action: "What's our SLA performance for the last 30 days?",
   },
   {
     icon: HardDrive,
