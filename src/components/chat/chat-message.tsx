@@ -1,12 +1,12 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Message } from 'ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter, SyntaxHighlighterProps } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Sparkles, Copy, Check } from 'lucide-react';
+import { User, Sparkles, Copy, Check, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 
@@ -15,12 +15,43 @@ interface ChatMessageProps {
   isLoading?: boolean;
 }
 
+function formatTime(date: Date | string | undefined): string {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+
+  // If less than 1 minute ago
+  if (minutes < 1) return 'Just now';
+  // If less than 1 hour ago
+  if (minutes < 60) return `${minutes}m ago`;
+  // If today, show time
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  // If yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  }
+  // Otherwise show date
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 export const ChatMessage = memo(function ChatMessage({
   message,
   isLoading,
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [showTimestamp, setShowTimestamp] = useState(false);
   const isUser = message.role === 'user';
+
+  const timestamp = useMemo(() => formatTime(message.createdAt), [message.createdAt]);
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -31,9 +62,11 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <div
       className={cn(
-        'flex gap-4',
+        'group flex gap-4',
         isUser ? 'flex-row-reverse' : 'flex-row'
       )}
+      onMouseEnter={() => setShowTimestamp(true)}
+      onMouseLeave={() => setShowTimestamp(false)}
     >
       {/* Avatar */}
       <div
@@ -156,20 +189,39 @@ export const ChatMessage = memo(function ChatMessage({
           )}
         </div>
 
-        {/* Tool calls indicator */}
-        {message.toolInvocations && message.toolInvocations.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {message.toolInvocations.map((tool, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-1 text-xs text-turquoise-700"
-              >
-                <Sparkles className="h-3 w-3" />
-                {tool.toolName}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Timestamp and tool calls */}
+        <div className={cn(
+          'flex items-center gap-2 flex-wrap',
+          isUser ? 'justify-end' : 'justify-start'
+        )}>
+          {/* Timestamp - shows on hover */}
+          {timestamp && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-xs text-gray-400 transition-opacity',
+                showTimestamp ? 'opacity-100' : 'opacity-0'
+              )}
+            >
+              <Clock className="h-3 w-3" />
+              {timestamp}
+            </span>
+          )}
+
+          {/* Tool calls indicator */}
+          {message.toolInvocations && message.toolInvocations.length > 0 && (
+            <>
+              {message.toolInvocations.map((tool, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-1 text-xs text-turquoise-700"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {tool.toolName}
+                </span>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

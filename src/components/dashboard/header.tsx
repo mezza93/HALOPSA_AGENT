@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Bell, Search, Sparkles } from 'lucide-react';
+import { Menu, X, Bell, Search, Sparkles, Command } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConnectionSwitcher } from './connection-switcher';
 import { cn } from '@/lib/utils/cn';
 
 interface HeaderProps {
@@ -58,9 +59,45 @@ export function DashboardHeader({ user }: HeaderProps) {
         </div>
 
         {/* Right side actions */}
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <Button variant="ghost" size="icon" className="hidden sm:flex">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Connection switcher */}
+          <ConnectionSwitcher />
+
+          {/* Command palette trigger */}
+          <button
+            onClick={() => {
+              // Trigger command palette via keyboard event
+              const event = new KeyboardEvent('keydown', {
+                key: 'k',
+                metaKey: true,
+                bubbles: true,
+              });
+              document.dispatchEvent(event);
+            }}
+            className="hidden sm:flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            title="Open command palette (⌘K)"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden md:inline">Search...</span>
+            <kbd className="hidden md:flex items-center gap-0.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs">
+              <Command className="h-3 w-3" />K
+            </kbd>
+          </button>
+
+          {/* Mobile search button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden"
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', {
+                key: 'k',
+                metaKey: true,
+                bubbles: true,
+              });
+              document.dispatchEvent(event);
+            }}
+          >
             <Search className="h-5 w-5" />
           </Button>
 
