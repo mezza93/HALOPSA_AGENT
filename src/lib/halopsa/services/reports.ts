@@ -210,9 +210,16 @@ export class DashboardService extends BaseService<Dashboard, DashboardApiRespons
           w: w.w ?? 4,
           h: w.h ?? 2,
         };
-        if (w.reportId) widgetData.report_id = w.reportId;
-        if (w.filterId) widgetData.filter_id = w.filterId;
-        if (w.ticketAreaId) widgetData.ticketarea_id = w.ticketAreaId;
+        // Use proper null checks - reportId of 0 is invalid, but > 0 should be included
+        if (w.reportId !== undefined && w.reportId !== null && w.reportId > 0) {
+          widgetData.report_id = w.reportId;
+        }
+        if (w.filterId !== undefined && w.filterId !== null && w.filterId > 0) {
+          widgetData.filter_id = w.filterId;
+        }
+        if (w.ticketAreaId !== undefined && w.ticketAreaId !== null && w.ticketAreaId > 0) {
+          widgetData.ticketarea_id = w.ticketAreaId;
+        }
         if (w.colour) widgetData.initialcolour = w.colour;
         // Additional properties for filter-based widgets
         if (w.viewType !== undefined) widgetData.view_type = w.viewType;
@@ -470,15 +477,27 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
       [apiData]
     );
 
+    console.log(`[ReportService] createCustomReport response:`, JSON.stringify(response).substring(0, 500));
+
     // Handle response which may be array or single object
     if (Array.isArray(response) && response.length > 0) {
-      return this.transform(response[0]);
+      const report = this.transform(response[0]);
+      if (!report.id || report.id <= 0) {
+        throw new Error(`Report created but no valid ID returned. Response: ${JSON.stringify(response[0]).substring(0, 200)}`);
+      }
+      console.log(`[ReportService] Created report '${report.name}' with ID: ${report.id}`);
+      return report;
     } else if (response && typeof response === 'object' && 'id' in response) {
-      return this.transform(response as ReportApiResponse);
+      const report = this.transform(response as ReportApiResponse);
+      if (!report.id || report.id <= 0) {
+        throw new Error(`Report created but no valid ID returned. Response: ${JSON.stringify(response).substring(0, 200)}`);
+      }
+      console.log(`[ReportService] Created report '${report.name}' with ID: ${report.id}`);
+      return report;
     }
 
-    // Fallback - return minimal report object
-    return { id: 0, name, isShared: false };
+    // API didn't return expected format - throw error instead of returning invalid report
+    throw new Error(`Failed to create report: unexpected API response format. Response: ${JSON.stringify(response).substring(0, 200)}`);
   }
 }
 

@@ -606,59 +606,54 @@ export class DashboardBuilderService {
    * Get existing report or create new one for a widget template.
    *
    * Priority:
-   * 1. Try HaloPSA Report Repository (pre-built, tested reports)
-   * 2. Fall back to custom SQL if repository not available or no match found
+   * 1. Check for existing valid dashboard report
+   * 2. Try HaloPSA Report Repository (pre-built, tested reports)
+   * 3. Fall back to custom SQL if repository not available or no match found
    */
   async getOrCreateReport(template: WidgetTemplate): Promise<number | null> {
-    // ALWAYS delete any existing "Dashboard - *" reports with matching name
-    // This ensures we always use fresh reports
-    const reports = await this.getAllReports();
     const dashboardReportName = template.fallbackReportName;
 
+    // First, check if we have an existing valid dashboard report
+    const reports = await this.getAllReports(true); // Force refresh
+
     if (dashboardReportName) {
-      // Find ALL dashboard reports that might have old/bad SQL
-      const existingDashboardReports = reports.filter(
-        r => r.name === dashboardReportName ||
-             (r.name?.startsWith('Dashboard - ') &&
-              template.reportKeywords.some(kw =>
-                r.name?.toLowerCase().includes(kw.toLowerCase())
-              ))
+      // Look for an existing report with the exact name
+      const existingReport = reports.find(r =>
+        r.name === dashboardReportName && r.id && r.id > 0
       );
 
-      // Delete ALL matching old reports
-      for (const oldReport of existingDashboardReports) {
-        if (oldReport.id) {
-          console.log(`[DashboardBuilder] Deleting old report '${oldReport.name}' (ID: ${oldReport.id}) to use fresh report`);
-          try {
-            await this.reportService.delete(oldReport.id);
-            console.log(`[DashboardBuilder] Deleted old report ID: ${oldReport.id}`);
-          } catch (err) {
-            console.warn(`[DashboardBuilder] Could not delete old report ${oldReport.id}: ${err}`);
-          }
-        }
-      }
-
-      // Clear cache after deletions
-      if (existingDashboardReports.length > 0) {
-        this.reportCache = null;
+      if (existingReport && existingReport.id && existingReport.id > 0) {
+        console.log(`[DashboardBuilder] Found existing report '${existingReport.name}' (ID: ${existingReport.id})`);
+        return existingReport.id;
       }
     }
 
     // PRIORITY 1: Try HaloPSA Report Repository first
     // Repository reports are pre-built and tested by HaloPSA
-    const repositoryReport = await this.tryImportFromRepository(template);
-    if (repositoryReport && repositoryReport.id) {
-      console.log(`[DashboardBuilder] Using repository report ID: ${repositoryReport.id}`);
-      return repositoryReport.id;
+    try {
+      const repositoryReport = await this.tryImportFromRepository(template);
+      if (repositoryReport && repositoryReport.id && repositoryReport.id > 0) {
+        console.log(`[DashboardBuilder] Using repository report ID: ${repositoryReport.id}`);
+        return repositoryReport.id;
+      }
+    } catch (error) {
+      console.warn(`[DashboardBuilder] Repository import failed for ${template.name}:`, error);
+      // Continue to fallback
     }
 
     // PRIORITY 2: Fall back to custom SQL
     console.log(`[DashboardBuilder] Creating custom SQL report for ${template.name}`);
-    const newReport = await this.createReportForWidget(template);
-    if (newReport && newReport.id) {
-      return newReport.id;
+    try {
+      const newReport = await this.createReportForWidget(template);
+      if (newReport && newReport.id && newReport.id > 0) {
+        console.log(`[DashboardBuilder] Created custom report ID: ${newReport.id}`);
+        return newReport.id;
+      }
+    } catch (error) {
+      console.error(`[DashboardBuilder] Failed to create custom report for ${template.name}:`, error);
     }
 
+    console.error(`[DashboardBuilder] Could not get or create report for ${template.name}`);
     return null;
   }
 
@@ -678,6 +673,8 @@ export class DashboardBuilderService {
       return null;
     }
 
+    console.log(`[DashboardBuilder] Building widget: ${templateName} (type: ${template.widgetType})`);
+
     const widget: WidgetConfig = {
       i: '0', // Will be set by caller
       title: customTitle || template.name,
@@ -689,29 +686,39 @@ export class DashboardBuilderService {
       initialcolour: customColor || template.color,
     };
 
-    // For report-based widgets, find or create report
+    // For report-based widgets (charts), find or create report
+    // Widget types: 0=bar chart, 1=pie chart, 2=counter (report-based)
     if ([0, 1, 2].includes(template.widgetType)) {
+      console.log(`[DashboardBuilder] Widget ${templateName} requires report, getting or creating...`);
+
       const reportId = await this.getOrCreateReport(template);
-      if (!reportId) {
-        console.error(`[DashboardBuilder] Could not get/create report for ${templateName}`);
-        return null;
+
+      // Validate we got a valid report ID
+      if (reportId === null || reportId === undefined || reportId <= 0) {
+        console.error(`[DashboardBuilder] FAILED: Could not get/create valid report for ${templateName}. Got reportId: ${reportId}`);
+        return null; // Don't create widget without valid report
       }
+
       widget.report_id = reportId;
+      console.log(`[DashboardBuilder] Widget ${templateName} assigned report_id: ${reportId}`);
     }
 
     // For filter-based widgets, add filter settings
+    // Widget types: 6=list, 7=counter (filter-based)
     if ([6, 7].includes(template.widgetType)) {
-      if (template.filterId) {
+      if (template.filterId && template.filterId > 0) {
         widget.filter_id = template.filterId;
       }
-      if (template.ticketareaId) {
+      if (template.ticketareaId && template.ticketareaId > 0) {
         widget.ticketarea_id = template.ticketareaId;
       }
       widget.view_type = 'all';
       widget.counter_type = 0;
       widget.count_format_type = 0;
+      console.log(`[DashboardBuilder] Widget ${templateName} is filter-based with filter_id: ${widget.filter_id}`);
     }
 
+    console.log(`[DashboardBuilder] Widget ${templateName} built successfully:`, JSON.stringify(widget));
     return widget;
   }
 
