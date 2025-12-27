@@ -8,23 +8,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { HaloContext } from './context';
 import { SchemaService } from '@/lib/halopsa/services/schema';
-
-/**
- * Format error for tool response.
- */
-function formatError(error: unknown, toolName: string): { success: false; error: string } {
-  console.error(`[Tool:${toolName}] Error:`, error);
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (message.includes('401') || message.includes('Unauthorized')) {
-    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
-  }
-  if (message.includes('403') || message.includes('Forbidden')) {
-    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
-  }
-
-  return { success: false, error: `Operation failed: ${message}` };
-}
+import { formatError } from './utils';
 
 export function createSchemaTools(ctx: HaloContext) {
   const schemaService = new SchemaService(ctx.client);

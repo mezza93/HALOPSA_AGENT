@@ -6,40 +6,14 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { HaloContext } from './context';
 import type { Client, Site, User } from '@/lib/halopsa/types';
+import { formatError, TOOL_DEFAULTS } from './utils';
 
-const DEFAULT_COUNT = 20;
-const MAX_PAGE_SIZE = 100;
+const { DEFAULT_COUNT, MAX_PAGE_SIZE } = TOOL_DEFAULTS;
 
 function formatSiteAddress(site: Site): string | undefined {
   const parts = [site.line1, site.line2, site.line3, site.line4, site.postcode, site.country]
     .filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : undefined;
-}
-
-/**
- * Format error for tool response.
- */
-function formatError(error: unknown, toolName: string): { success: false; error: string } {
-  console.error(`[Tool:${toolName}] Error:`, error);
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (message.includes('401') || message.includes('Unauthorized')) {
-    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
-  }
-  if (message.includes('403') || message.includes('Forbidden')) {
-    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
-  }
-  if (message.includes('404') || message.includes('Not Found')) {
-    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
-  }
-  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
-    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
-  }
-  if (message.includes('ECONNREFUSED') || message.includes('network')) {
-    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
-  }
-
-  return { success: false, error: `Operation failed: ${message}` };
 }
 
 export function createClientTools(ctx: HaloContext) {

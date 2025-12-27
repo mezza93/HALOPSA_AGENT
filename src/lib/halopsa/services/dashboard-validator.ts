@@ -507,17 +507,34 @@ export class DashboardValidatorService {
   async createValidatedReport(
     name: string,
     sqlQuery: string,
-    templateKey?: keyof typeof VALIDATED_SQL_TEMPLATES
+    templateKey?: keyof typeof VALIDATED_SQL_TEMPLATES,
+    chartConfig?: {
+      chartType?: number;
+      xAxis?: string;
+      yAxis?: string;
+    }
   ): Promise<{ report: Report | null; validated: boolean; usedFallback: boolean }> {
     // First, try the provided SQL
     try {
-      const report = await this.reportService.createCustomReport({
+      const reportOptions: Parameters<typeof this.reportService.createCustomReport>[0] = {
         name,
         sqlQuery: sqlQuery.trim(),
         description: 'Auto-created for dashboard widget',
         category: 'Dashboard',
         isShared: true,
-      });
+      };
+
+      // Add chart configuration if provided
+      if (chartConfig?.chartType !== undefined) {
+        reportOptions.chartType = chartConfig.chartType;
+        reportOptions.xAxis = chartConfig.xAxis;
+        reportOptions.yAxis = chartConfig.yAxis;
+        reportOptions.chartTitle = name;
+        reportOptions.count = false; // SQL already has COUNT(*)
+        reportOptions.showGraphValues = true;
+      }
+
+      const report = await this.reportService.createCustomReport(reportOptions);
 
       // Validate by running
       const validation = await this.validateReport(report.id);

@@ -14,6 +14,7 @@ import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
+import { createDefaultApiKeyForUser } from './api-keys';
 
 // Extend session types
 declare module 'next-auth' {
@@ -166,8 +167,12 @@ const authConfig: NextAuthConfig = {
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
-        }).catch(() => {
-          // User might not exist yet (first OAuth sign in)
+        }).catch((error) => {
+          // P2025: Record not found - user doesn't exist yet (first OAuth sign in)
+          // This is expected for new OAuth users before the adapter creates them
+          if (error?.code !== 'P2025') {
+            console.error('Failed to update last login time:', error);
+          }
         });
       }
       return true;
@@ -177,6 +182,16 @@ const authConfig: NextAuthConfig = {
     async createUser({ user }) {
       // Log new user creation
       console.log(`New user created: ${user.email}`);
+
+      // Create default API key with 1M monthly token limit for OAuth users
+      if (user.id) {
+        try {
+          await createDefaultApiKeyForUser(user.id);
+          console.log(`Default API key created for user: ${user.email}`);
+        } catch (error) {
+          console.error(`Failed to create API key for user ${user.email}:`, error);
+        }
+      }
     },
   },
 };

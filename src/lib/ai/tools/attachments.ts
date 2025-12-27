@@ -6,29 +6,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { HaloContext } from './context';
 import type { Attachment } from '@/lib/halopsa/services/attachments';
-
-function formatError(error: unknown, toolName: string): { success: false; error: string } {
-  console.error(`[Tool:${toolName}] Error:`, error);
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (message.includes('401') || message.includes('Unauthorized')) {
-    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
-  }
-  if (message.includes('403') || message.includes('Forbidden')) {
-    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
-  }
-  if (message.includes('404') || message.includes('Not Found')) {
-    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
-  }
-  if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
-    return { success: false, error: 'Connection to HaloPSA timed out. Please try again.' };
-  }
-  if (message.includes('ECONNREFUSED') || message.includes('network')) {
-    return { success: false, error: 'Could not connect to HaloPSA. Please check the connection URL.' };
-  }
-
-  return { success: false, error: `Operation failed: ${message}` };
-}
+import { formatError } from './utils';
 
 export function createAttachmentTools(ctx: HaloContext) {
   return {

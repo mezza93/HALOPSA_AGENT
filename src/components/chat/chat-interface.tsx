@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const { activeConnection, initialize, isLoading: isLoadingConnection } = useConnectionStore();
 
@@ -123,16 +124,13 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
   };
 
   // Handle option card selection
-  const handleOptionSelect = (option: string) => {
+  const handleOptionSelect = useCallback((option: string) => {
     setInput(option);
     // Auto-submit after a short delay to show the selection
     setTimeout(() => {
-      const form = document.querySelector('form');
-      if (form) {
-        form.requestSubmit();
-      }
+      formRef.current?.requestSubmit();
     }, 100);
-  };
+  }, [setInput]);
 
   // Parse options from the last assistant message
   const getOptionsFromLastMessage = () => {
@@ -235,6 +233,7 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
         attachments={attachments}
         setAttachments={setAttachments}
         onStop={stop}
+        formRef={formRef}
       />
     </div>
   );

@@ -7,26 +7,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { HaloContext } from './context';
 import { DashboardValidatorService, VALIDATED_SQL_TEMPLATES } from '@/lib/halopsa/services/dashboard-validator';
-
-/**
- * Format error for tool response.
- */
-function formatError(error: unknown, toolName: string): { success: false; error: string } {
-  console.error(`[Tool:${toolName}] Error:`, error);
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (message.includes('401') || message.includes('Unauthorized')) {
-    return { success: false, error: 'Authentication failed with HaloPSA. Please check your connection credentials.' };
-  }
-  if (message.includes('403') || message.includes('Forbidden')) {
-    return { success: false, error: 'Access denied. Your HaloPSA account may not have permission for this operation.' };
-  }
-  if (message.includes('404') || message.includes('Not Found')) {
-    return { success: false, error: 'The requested resource was not found in HaloPSA.' };
-  }
-
-  return { success: false, error: `Operation failed: ${message}` };
-}
+import { formatError } from './utils';
 
 export function createDashboardValidatorTools(ctx: HaloContext) {
   // Create the validator service
@@ -133,7 +114,9 @@ This is safer than createReport as it:
 1. Tries the provided SQL first
 2. If it fails, attempts to fix common errors
 3. If still failing, falls back to a validated template
-4. Confirms the report works before returning`,
+4. Confirms the report works before returning
+
+IMPORTANT: For chart reports, you MUST provide chartType, xAxis, and yAxis that match your SQL column aliases.`,
       parameters: z.object({
         name: z.string().describe('Report name'),
         sqlQuery: z.string().describe('SQL query for the report'),
@@ -149,14 +132,21 @@ This is safer than createReport as it:
           'response_time_avg',
           'top_callers',
         ]).optional().describe('Fallback template to use if SQL fails'),
+        chartType: z.number().optional().describe('Chart type: 0=bar, 1=line, 2=pie, 3=doughnut'),
+        xAxis: z.string().optional().describe('X-axis column name from SQL (must match column alias exactly)'),
+        yAxis: z.string().optional().describe('Y-axis column name from SQL (must match column alias exactly)'),
       }),
-      execute: async ({ name, sqlQuery, templateKey }) => {
+      execute: async ({ name, sqlQuery, templateKey, chartType, xAxis, yAxis }) => {
         try {
           console.log(`[Tool:createValidatedReport] Creating report '${name}'`);
+
+          const chartConfig = chartType !== undefined ? { chartType, xAxis, yAxis } : undefined;
+
           const result = await validator.createValidatedReport(
             name,
             sqlQuery,
-            templateKey as keyof typeof VALIDATED_SQL_TEMPLATES | undefined
+            templateKey as keyof typeof VALIDATED_SQL_TEMPLATES | undefined,
+            chartConfig
           );
 
           if (result.report) {

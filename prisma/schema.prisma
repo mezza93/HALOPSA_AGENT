@@ -34,6 +34,12 @@ model User {
   monthlyTokens Int       @default(0)
   tokenResetAt  DateTime?
 
+  // Branding customization
+  brandPrimaryColor   String?   // Primary color in hex (e.g., "#14b8a6")
+  brandSecondaryColor String?   // Secondary color in hex (e.g., "#0d9488")
+  brandReportNaming   String?   // Naming schema for reports (e.g., "{company} - {type} - {date}")
+  brandLogoUrl        String?   // URL to uploaded logo
+
   // Status
   isActive      Boolean   @default(true)
   lastLoginAt   DateTime?
@@ -52,9 +58,50 @@ model User {
   conversationMemories ConversationMemory[]
   notebookEntries      NotebookEntry[]
   conversationSummaries ConversationSummary[]
+  apiKeys              ApiKey[]
 
   @@index([email])
   @@index([role])
+}
+
+// ===========================================
+// API Keys & Token Limits
+// ===========================================
+
+model ApiKey {
+  id                String    @id @default(cuid())
+  userId            String
+
+  // Key identification (we store hash, not the raw key)
+  keyPrefix         String    // First 8 chars for identification (e.g., "halo_abc1")
+  keyHash           String    @unique // SHA-256 hash of the full key
+  name              String?   // User-friendly name for the key
+
+  // Token limits
+  monthlyTokenLimit Int       @default(1000000) // 1 million tokens default
+  tokensUsed        Int       @default(0)       // Current month's usage
+  tokenResetAt      DateTime                    // When tokens reset (monthly)
+
+  // Rate limiting
+  requestsPerMinute Int       @default(60)      // Rate limit
+  lastRequestAt     DateTime?
+
+  // Status
+  isActive          Boolean   @default(true)
+  revokedAt         DateTime?
+  revokedReason     String?
+
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastUsedAt        DateTime?
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyPrefix])
+  @@index([isActive])
 }
 
 enum UserRole {

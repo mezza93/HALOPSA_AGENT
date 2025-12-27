@@ -18,14 +18,48 @@ const rateLimitedRoutes = ['/api/chat', '/api/halopsa', '/api/upload'];
 // Simple in-memory rate limiter (use Redis in production for multi-instance)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
+// Maximum entries before triggering cleanup (prevents unbounded growth)
+const MAX_RATE_LIMIT_ENTRIES = 10000;
+
+// Track last cleanup time to avoid cleaning on every request
+let lastCleanupTime = 0;
+const CLEANUP_INTERVAL_MS = 60000; // Clean up at most once per minute
+
 function getRateLimitKey(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
   return `${ip}:${request.nextUrl.pathname}`;
 }
 
+/**
+ * Clean up expired entries from the rate limit map.
+ * Called lazily when map size exceeds threshold or periodically.
+ */
+function cleanupExpiredEntries(): void {
+  const now = Date.now();
+
+  // Don't clean up too frequently
+  if (now - lastCleanupTime < CLEANUP_INTERVAL_MS && rateLimitMap.size < MAX_RATE_LIMIT_ENTRIES) {
+    return;
+  }
+
+  lastCleanupTime = now;
+
+  for (const [key, record] of rateLimitMap) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+}
+
 function checkRateLimit(key: string, limit: number, windowMs: number): { allowed: boolean; remaining: number } {
   const now = Date.now();
+
+  // Trigger cleanup if needed (prevents memory leak)
+  if (rateLimitMap.size >= MAX_RATE_LIMIT_ENTRIES || now - lastCleanupTime >= CLEANUP_INTERVAL_MS) {
+    cleanupExpiredEntries();
+  }
+
   const record = rateLimitMap.get(key);
 
   if (!record || now > record.resetTime) {
@@ -40,9 +74,6 @@ function checkRateLimit(key: string, limit: number, windowMs: number): { allowed
   record.count++;
   return { allowed: true, remaining: limit - record.count };
 }
-
-// Note: Cleanup happens during checkRateLimit calls
-// setInterval is not supported in Edge runtime
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

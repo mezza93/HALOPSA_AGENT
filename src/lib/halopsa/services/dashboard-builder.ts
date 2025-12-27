@@ -604,7 +604,10 @@ export class DashboardBuilderService {
         reportOptions.xAxisCaption = template.xAxisCaption;
         reportOptions.yAxisCaption = template.yAxisCaption;
         reportOptions.chartTitle = template.name;
-        reportOptions.count = true;
+        // For SQL with GROUP BY and COUNT(*), count should be false
+        // (the SQL already provides the count values)
+        // count=true would make HaloPSA try to count records instead of using SQL values
+        reportOptions.count = false;
         reportOptions.showGraphValues = true;
 
         console.log(`[DashboardBuilder] Creating chart report with config: chartType=${template.chartType}, xAxis='${template.xAxis}', yAxis='${template.yAxis}'`);

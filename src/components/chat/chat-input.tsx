@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   Send,
@@ -22,6 +22,7 @@ interface ChatInputProps {
   attachments: File[];
   setAttachments: (files: File[]) => void;
   onStop: () => void;
+  formRef?: React.RefObject<HTMLFormElement | null>;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -39,8 +40,42 @@ export function ChatInput({
   attachments,
   setAttachments,
   onStop,
+  formRef,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [previewUrls, setPreviewUrls] = useState<Map<File, string>>(new Map());
+
+  // Create and manage object URLs for image previews
+  useEffect(() => {
+    const newUrls = new Map<File, string>();
+
+    attachments.forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        // Reuse existing URL if file is the same object
+        const existingUrl = previewUrls.get(file);
+        if (existingUrl) {
+          newUrls.set(file, existingUrl);
+        } else {
+          newUrls.set(file, URL.createObjectURL(file));
+        }
+      }
+    });
+
+    // Revoke URLs that are no longer needed
+    previewUrls.forEach((url, file) => {
+      if (!newUrls.has(file)) {
+        URL.revokeObjectURL(url);
+      }
+    });
+
+    setPreviewUrls(newUrls);
+
+    // Cleanup all URLs on unmount
+    return () => {
+      newUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments]);
 
   // Handle file drop
   const onDrop = useCallback(
@@ -110,9 +145,9 @@ export function ChatInput({
                 key={index}
                 className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm"
               >
-                {file.type.startsWith('image/') ? (
+                {file.type.startsWith('image/') && previewUrls.get(file) ? (
                   <img
-                    src={URL.createObjectURL(file)}
+                    src={previewUrls.get(file)}
                     alt={file.name}
                     className="h-8 w-8 rounded object-cover"
                   />
@@ -137,7 +172,7 @@ export function ChatInput({
         )}
 
         {/* Input form */}
-        <form onSubmit={handleSubmit} className="relative">
+        <form ref={formRef} onSubmit={handleSubmit} className="relative">
           <div
             {...getRootProps()}
             className={cn(

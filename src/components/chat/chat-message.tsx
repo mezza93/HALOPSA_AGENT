@@ -43,6 +43,13 @@ function formatTime(date: Date | string | undefined): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+// Strip internal markers like [OPTIONS: ...] from displayed content
+function cleanMessageContent(content: string): string {
+  return content
+    .replace(/\[OPTIONS:\s*[^\]]+\]/gi, '')
+    .trim();
+}
+
 export const ChatMessage = memo(function ChatMessage({
   message,
   isLoading,
@@ -50,6 +57,7 @@ export const ChatMessage = memo(function ChatMessage({
   const [copied, setCopied] = useState(false);
   const [showTimestamp, setShowTimestamp] = useState(false);
   const isUser = message.role === 'user';
+  const displayContent = useMemo(() => cleanMessageContent(message.content), [message.content]);
 
   const timestamp = useMemo(() => formatTime(message.createdAt), [message.createdAt]);
 
@@ -183,7 +191,7 @@ export const ChatMessage = memo(function ChatMessage({
                   },
                 }}
               >
-                {message.content}
+                {displayContent}
               </ReactMarkdown>
             </div>
           )}

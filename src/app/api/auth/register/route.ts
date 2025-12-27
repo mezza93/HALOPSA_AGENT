@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { createDefaultApiKeyForUser } from '@/lib/api-keys';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -58,10 +59,19 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Create default API key for the new user with 1M token monthly limit
+    const apiKey = await createDefaultApiKeyForUser(user.id);
+
     return NextResponse.json(
       {
         message: 'Account created successfully',
         user,
+        // Only show API key once at creation - user should save it
+        apiKey: apiKey ? {
+          key: apiKey,
+          notice: 'Save this API key securely. You will not be able to see it again.',
+          monthlyLimit: '1,000,000 tokens',
+        } : undefined,
       },
       { status: 201 }
     );

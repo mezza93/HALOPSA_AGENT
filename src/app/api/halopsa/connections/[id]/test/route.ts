@@ -68,7 +68,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         lastTestedAt: new Date(),
         testMessage: error instanceof Error ? error.message : 'Connection failed',
       },
-    }).catch(() => {});
+    }).catch((dbError) => {
+      console.error('Failed to update connection test status:', dbError);
+    });
 
     return NextResponse.json(
       { error: 'Connection test failed' },

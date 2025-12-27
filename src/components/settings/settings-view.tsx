@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import {
@@ -21,6 +21,10 @@ import {
   Moon,
   Sun,
   Monitor,
+  Paintbrush,
+  FileText,
+  Image as ImageIcon,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -34,11 +38,12 @@ interface SettingsViewProps {
   };
 }
 
-type TabId = 'profile' | 'connections' | 'notifications' | 'appearance' | 'security';
+type TabId = 'profile' | 'connections' | 'branding' | 'notifications' | 'appearance' | 'security';
 
 const tabs: { id: TabId; label: string; icon: React.ElementType; description: string }[] = [
   { id: 'profile', label: 'Profile', icon: User, description: 'Your personal information' },
   { id: 'connections', label: 'Connections', icon: Link2, description: 'HaloPSA integrations' },
+  { id: 'branding', label: 'Branding', icon: Paintbrush, description: 'Colors, logo & naming' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'Alert preferences' },
   { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme and display' },
   { id: 'security', label: 'Security', icon: Shield, description: 'Password and 2FA' },
@@ -49,6 +54,39 @@ export function SettingsView({ user }: SettingsViewProps) {
   const [name, setName] = useState(user.name || '');
   const [isLoading, setIsLoading] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+
+  // Branding state
+  const [brandingLoading, setBrandingLoading] = useState(false);
+  const [brandingSaving, setBrandingSaving] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState('#14b8a6');
+  const [secondaryColor, setSecondaryColor] = useState('#0d9488');
+  const [reportNaming, setReportNaming] = useState('{company} - {type} - {date}');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // Load branding settings
+  useEffect(() => {
+    async function loadBranding() {
+      setBrandingLoading(true);
+      try {
+        const response = await fetch('/api/user/branding');
+        if (response.ok) {
+          const data = await response.json();
+          setPrimaryColor(data.primaryColor || '#14b8a6');
+          setSecondaryColor(data.secondaryColor || '#0d9488');
+          setReportNaming(data.reportNaming || '{company} - {type} - {date}');
+          setLogoUrl(data.logoUrl);
+          setLogoPreview(data.logoUrl);
+        }
+      } catch (error) {
+        console.error('Failed to load branding settings:', error);
+      } finally {
+        setBrandingLoading(false);
+      }
+    }
+    loadBranding();
+  }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +109,74 @@ export function SettingsView({ user }: SettingsViewProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Logo must be less than 2MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('File must be an image');
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBrandingSaving(true);
+
+    try {
+      // For now, we'll save the logo as a data URL
+      // In production, you'd upload to a file storage service
+      let finalLogoUrl = logoUrl;
+      if (logoFile && logoPreview) {
+        finalLogoUrl = logoPreview; // Using data URL for demo
+      }
+
+      const response = await fetch('/api/user/branding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor,
+          secondaryColor,
+          reportNaming,
+          logoUrl: finalLogoUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save branding');
+      }
+
+      setLogoUrl(finalLogoUrl);
+      setLogoFile(null);
+      toast.success('Branding settings saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save branding');
+    } finally {
+      setBrandingSaving(false);
+    }
+  };
+
+  const resetBrandingToDefaults = () => {
+    setPrimaryColor('#14b8a6');
+    setSecondaryColor('#0d9488');
+    setReportNaming('{company} - {type} - {date}');
+    setLogoPreview(null);
+    setLogoUrl(null);
+    setLogoFile(null);
+    toast.info('Branding reset to defaults (save to apply)');
   };
 
   return (
@@ -224,6 +330,248 @@ export function SettingsView({ user }: SettingsViewProps) {
                 <p className="text-muted-foreground text-center py-8">
                   Go to the Connections page to add or manage your HaloPSA integrations.
                 </p>
+              </div>
+            )}
+
+            {activeTab === 'branding' && (
+              <div className="space-y-6">
+                {brandingLoading ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-turquoise-500" />
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveBranding} className="space-y-6">
+                    {/* Colors Section */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-turquoise-400 to-turquoise-600">
+                          <Palette className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold">Brand Colors</h2>
+                          <p className="text-sm text-muted-foreground">
+                            Customize colors for reports and dashboards
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium">Primary Color</label>
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <input
+                                type="color"
+                                value={primaryColor}
+                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                className="w-12 h-12 rounded-lg border-2 border-gray-200 cursor-pointer appearance-none bg-transparent"
+                                style={{ backgroundColor: primaryColor }}
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              value={primaryColor}
+                              onChange={(e) => setPrimaryColor(e.target.value)}
+                              pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                              className="input-field flex-1 font-mono uppercase"
+                              placeholder="#14b8a6"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Used for charts, headings, and accents
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium">Secondary Color</label>
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <input
+                                type="color"
+                                value={secondaryColor}
+                                onChange={(e) => setSecondaryColor(e.target.value)}
+                                className="w-12 h-12 rounded-lg border-2 border-gray-200 cursor-pointer appearance-none bg-transparent"
+                                style={{ backgroundColor: secondaryColor }}
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              value={secondaryColor}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                              className="input-field flex-1 font-mono uppercase"
+                              placeholder="#0d9488"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Used for secondary elements and backgrounds
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Color Preview */}
+                      <div className="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                        <p className="text-sm font-medium mb-3">Preview</p>
+                        <div className="flex items-center gap-4">
+                          <div
+                            className="h-16 w-32 rounded-lg shadow-sm flex items-center justify-center text-white font-medium"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            Primary
+                          </div>
+                          <div
+                            className="h-16 w-32 rounded-lg shadow-sm flex items-center justify-center text-white font-medium"
+                            style={{ backgroundColor: secondaryColor }}
+                          >
+                            Secondary
+                          </div>
+                          <div className="flex-1 h-16 rounded-lg shadow-sm overflow-hidden flex">
+                            <div className="w-1/2 h-full" style={{ backgroundColor: primaryColor }} />
+                            <div className="w-1/2 h-full" style={{ backgroundColor: secondaryColor }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Report Naming Section */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-turquoise-400 to-turquoise-600">
+                          <FileText className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold">Report Naming</h2>
+                          <p className="text-sm text-muted-foreground">
+                            Set a naming convention for generated reports
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium">Naming Schema</label>
+                        <input
+                          type="text"
+                          value={reportNaming}
+                          onChange={(e) => setReportNaming(e.target.value)}
+                          className="input-field w-full font-mono"
+                          placeholder="{company} - {type} - {date}"
+                        />
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Available placeholders: <code className="bg-gray-100 px-1 rounded">{'{company}'}</code>,{' '}
+                          <code className="bg-gray-100 px-1 rounded">{'{type}'}</code>,{' '}
+                          <code className="bg-gray-100 px-1 rounded">{'{date}'}</code>,{' '}
+                          <code className="bg-gray-100 px-1 rounded">{'{time}'}</code>,{' '}
+                          <code className="bg-gray-100 px-1 rounded">{'{user}'}</code>
+                        </p>
+                      </div>
+
+                      {/* Naming Preview */}
+                      <div className="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Example: </span>
+                          <span className="font-medium">
+                            {reportNaming
+                              .replace('{company}', 'Acme Corp')
+                              .replace('{type}', 'Monthly Summary')
+                              .replace('{date}', new Date().toLocaleDateString())
+                              .replace('{time}', new Date().toLocaleTimeString())
+                              .replace('{user}', user.name || 'User')}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Logo Section */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-turquoise-400 to-turquoise-600">
+                          <ImageIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold">Logo</h2>
+                          <p className="text-sm text-muted-foreground">
+                            Upload your company logo for reports
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-6">
+                        <div className="shrink-0">
+                          {logoPreview ? (
+                            <div className="relative group">
+                              <img
+                                src={logoPreview}
+                                alt="Logo preview"
+                                className="h-24 w-24 object-contain rounded-xl border-2 border-gray-200 bg-white p-2"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLogoPreview(null);
+                                  setLogoUrl(null);
+                                  setLogoFile(null);
+                                }}
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                              <ImageIcon className="h-8 w-8 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1">
+                          <label className="block">
+                            <span className="sr-only">Choose logo file</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoChange}
+                              className="block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-lg file:border-0
+                                file:text-sm file:font-medium
+                                file:bg-turquoise-50 file:text-turquoise-700
+                                hover:file:bg-turquoise-100
+                                cursor-pointer"
+                            />
+                          </label>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            PNG, JPG, or SVG. Max 2MB. Recommended size: 200x200px
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-between items-center pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={resetBrandingToDefaults}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Reset to Defaults
+                      </Button>
+                      <Button type="submit" disabled={brandingSaving}>
+                        {brandingSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2 h-4 w-4" />
+                            Save Branding
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
 

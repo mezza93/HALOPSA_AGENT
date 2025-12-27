@@ -10,15 +10,7 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-
-/**
- * Format error for tool response.
- */
-function formatError(error: unknown, toolName: string): { success: false; error: string } {
-  console.error(`[Tool:${toolName}] Error:`, error);
-  const message = error instanceof Error ? error.message : String(error);
-  return { success: false, error: `Failed to fetch resource: ${message}` };
-}
+import { formatError } from './utils';
 
 /**
  * Fetch and extract text from a URL.

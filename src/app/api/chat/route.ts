@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/utils/encryption';
 import { createHaloToolsFromConfig, toolCategories, createAutomationTools, createMemoryTools, getMemoryContextForUser } from '@/lib/ai/tools';
 import { getHaloPSAContext } from '@/lib/context/halopsa-context';
+import { checkUserTokenLimit, recordUserTokenUsage } from '@/lib/api-keys';
 
 // Log environment check on startup (only in development)
 if (process.env.NODE_ENV === 'development') {
@@ -189,6 +190,20 @@ export async function POST(req: Request) {
       return new Response(
         JSON.stringify({ error: 'Please sign in to continue.' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check token limits before processing request
+    const tokenStatus = await checkUserTokenLimit(session.user.id);
+    if (tokenStatus.hasLimit && tokenStatus.tokensRemaining <= 0) {
+      console.log(`[Chat API] Token limit exceeded for user ${session.user.id}`);
+      return new Response(
+        JSON.stringify({
+          error: 'Monthly token limit exceeded. Your usage resets on the 1st of each month.',
+          tokensUsed: tokenStatus.tokensUsed,
+          percentUsed: tokenStatus.percentUsed,
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -379,7 +394,7 @@ export async function POST(req: Request) {
     let result;
     try {
       result = streamText({
-        model: anthropic('claude-sonnet-4-20250514'),
+        model: anthropic('claude-opus-4-5-20251101'),
         system: SYSTEM_PROMPT + connectionContext,
         messages,
         tools: Object.keys(tools).length > 0 ? tools : undefined,
@@ -411,6 +426,16 @@ export async function POST(req: Request) {
             });
           } catch (err) {
             console.error('Failed to save assistant message:', err);
+          }
+        }
+
+        // Update user's monthly token count for rate limiting
+        if (usage) {
+          const totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0);
+          try {
+            await recordUserTokenUsage(session.user.id, totalTokens);
+          } catch (err) {
+            console.error('Failed to update user token count:', err);
           }
         }
 

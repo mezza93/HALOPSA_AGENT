@@ -1,83 +1,107 @@
 /**
- * Utility functions for AI tools.
+ * Shared utility functions for AI tools.
  */
 
 /**
- * Wraps a tool execute function with error handling.
- * Returns a structured error response instead of throwing.
+ * Standard error response type for all tools.
  */
-export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  toolName: string
-): T {
-  return (async (...args: Parameters<T>) => {
-    try {
-      return await fn(...args);
-    } catch (error) {
-      console.error(`[Tool:${toolName}] Error:`, error);
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      // Check for specific error types
-      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        return {
-          success: false,
-          error: 'Authentication failed with HaloPSA. Please check your connection credentials.',
-        };
-      }
-      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-        return {
-          success: false,
-          error: 'Access denied. Your HaloPSA account may not have permission for this operation.',
-        };
-      }
-      if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
-        return {
-          success: false,
-          error: 'The requested resource was not found in HaloPSA.',
-        };
-      }
-      if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-        return {
-          success: false,
-          error: 'Connection to HaloPSA timed out. Please try again.',
-        };
-      }
-      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network')) {
-        return {
-          success: false,
-          error: 'Could not connect to HaloPSA. Please check the connection URL.',
-        };
-      }
-
-      return {
-        success: false,
-        error: `Operation failed: ${errorMessage}`,
-      };
-    }
-  }) as T;
+export interface ToolErrorResponse {
+  success: false;
+  error: string;
 }
 
 /**
- * Safe tool executor - wraps execute function with error handling.
+ * Format an error into a user-friendly response.
+ * Consolidates error handling logic for all AI tools.
  */
-export function safeExecute<TParams, TResult>(
-  toolName: string,
-  executeFn: (params: TParams) => Promise<TResult>
-): (params: TParams) => Promise<TResult | { success: false; error: string }> {
-  return async (params: TParams) => {
-    try {
-      return await executeFn(params);
-    } catch (error) {
-      console.error(`[Tool:${toolName}] Execution error:`, error);
+export function formatError(error: unknown, toolName: string): ToolErrorResponse {
+  console.error(`[Tool:${toolName}] Error:`, error);
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
 
-      // Return structured error
-      return {
-        success: false,
-        error: `Failed to execute ${toolName}: ${errorMessage}`,
-      };
-    }
+  // Authentication errors
+  if (message.includes('401') || message.includes('Unauthorized')) {
+    return {
+      success: false,
+      error: 'Authentication failed with HaloPSA. Please check your connection credentials.',
+    };
+  }
+
+  // Permission errors
+  if (message.includes('403') || message.includes('Forbidden')) {
+    return {
+      success: false,
+      error: 'Access denied. Your HaloPSA account may not have permission for this operation.',
+    };
+  }
+
+  // Not found errors
+  if (message.includes('404') || message.includes('Not Found') || message.includes('not found')) {
+    return {
+      success: false,
+      error: 'The requested resource was not found in HaloPSA.',
+    };
+  }
+
+  // Timeout errors
+  if (message.includes('timeout') || message.includes('ETIMEDOUT') || message.includes('ESOCKETTIMEDOUT')) {
+    return {
+      success: false,
+      error: 'Connection to HaloPSA timed out. Please try again.',
+    };
+  }
+
+  // Connection errors
+  if (message.includes('ECONNREFUSED') || message.includes('network') || message.includes('ENOTFOUND')) {
+    return {
+      success: false,
+      error: 'Could not connect to HaloPSA. Please check the connection URL.',
+    };
+  }
+
+  // Rate limiting
+  if (message.includes('429') || message.includes('rate limit') || message.includes('too many requests')) {
+    return {
+      success: false,
+      error: 'Too many requests. Please wait a moment and try again.',
+    };
+  }
+
+  // Validation errors
+  if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
+    return {
+      success: false,
+      error: `Validation error: ${message}`,
+    };
+  }
+
+  // Database/SQL errors
+  if (message.includes('Invalid object name') || message.includes('SQL') || message.includes('syntax')) {
+    return {
+      success: false,
+      error: `Database query error: ${message}`,
+    };
+  }
+
+  // Generic error
+  return {
+    success: false,
+    error: `Operation failed: ${message}`,
   };
 }
+
+/**
+ * Default pagination constants for tools.
+ */
+export const TOOL_DEFAULTS = {
+  /** Default number of items to return in list operations */
+  DEFAULT_COUNT: 20,
+  /** Maximum number of items per page */
+  MAX_PAGE_SIZE: 100,
+  /** Default days for expiring items lookups */
+  DEFAULT_EXPIRING_DAYS: 30,
+  /** Default days for warranty expiration lookups */
+  DEFAULT_WARRANTY_DAYS: 30,
+  /** Default limit for bulk operations */
+  DEFAULT_BULK_LIMIT: 10,
+} as const;

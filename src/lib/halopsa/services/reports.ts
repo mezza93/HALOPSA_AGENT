@@ -786,7 +786,9 @@ export class ReportRepositoryService {
       reportOptions.xAxis = options.xAxis ?? repoReport.xAxis;
       reportOptions.yAxis = options.yAxis ?? repoReport.yAxis;
       reportOptions.chartTitle = repoReport.chartTitle ?? repoReport.name;
-      reportOptions.count = true;
+      // For SQL with GROUP BY and COUNT(*), count should be false
+      // (the SQL already provides the count values)
+      reportOptions.count = false;
       reportOptions.showGraphValues = true;
 
       console.log(`[ReportRepository] Importing with chart config: chartType=${reportOptions.chartType}, xAxis='${reportOptions.xAxis}', yAxis='${reportOptions.yAxis}'`);
