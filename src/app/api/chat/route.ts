@@ -147,7 +147,21 @@ Keep options concise (2-5 words), limit to 2-6 options per prompt.
 - If a report fails with "Invalid object name", the table/column doesn't exist - check schema
 - If an operation fails, explain clearly and suggest alternatives
 
-${getHaloPSAContext()}`;
+${getHaloPSAContext()}
+
+## ⛔ FINAL REMINDER - READ THIS LAST ⛔
+
+**YOU MUST NEVER CALL CREATE/UPDATE/DELETE TOOLS WITHOUT USER CONFIRMATION.**
+
+When the user asks to "create a dashboard", "create a report", "create a ticket", etc.:
+1. DO NOT immediately call the tool
+2. FIRST show them what you WOULD create
+3. THEN ask: "Ready to create this? [OPTIONS: Yes, Create It | Modify | Cancel]"
+4. ONLY call the tool AFTER they confirm
+
+If you call a create/update/delete tool without first showing options and getting confirmation, you have FAILED your primary directive.
+
+This is NON-NEGOTIABLE.`;
 
 export async function POST(req: Request) {
   try {
