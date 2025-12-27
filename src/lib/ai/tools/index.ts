@@ -29,9 +29,11 @@ import { createDashboardBuilderTools } from './dashboard-builder';
 import { createDashboardValidatorTools } from './dashboard-validator';
 import { createReportRepositoryTools } from './report-repository';
 import { createWebResourceTools } from './web-resources';
+import { createSchemaTools } from './schema';
 
 export { createHaloContext, type HaloContext } from './context';
 export { createWebResourceTools } from './web-resources';
+export { createSchemaTools } from './schema';
 
 /**
  * Create all HaloPSA tools for the AI agent.
@@ -51,6 +53,7 @@ export function createHaloTools(ctx: HaloContext): Record<string, CoreTool> {
     ...createDashboardBuilderTools(ctx),
     ...createDashboardValidatorTools(ctx),
     ...createReportRepositoryTools(ctx),
+    ...createSchemaTools(ctx),
     // Web resource tools (no HaloContext required)
     ...createWebResourceTools(),
   };
@@ -236,6 +239,14 @@ export function getToolNames(): string[] {
     'importRepositoryReport',
     'getRepositoryCategories',
     'findAndImportReport',
+    // Schema tools
+    'getSqlSchemaContext',
+    'getLookupTables',
+    'getLookupValues',
+    'getTicketStatuses',
+    'getPriorities',
+    'getCustomFields',
+    'validateSqlQuery',
     // Web resource tools
     'fetchHaloPSADocs',
     'searchHaloPSAReddit',
@@ -419,6 +430,15 @@ export const toolCategories = {
     'deleteAttachment',
     'copyAttachments',
     'uploadAttachment',
+  ],
+  schema: [
+    'getSqlSchemaContext',
+    'getLookupTables',
+    'getLookupValues',
+    'getTicketStatuses',
+    'getPriorities',
+    'getCustomFields',
+    'validateSqlQuery',
   ],
   webResources: [
     'fetchHaloPSADocs',
