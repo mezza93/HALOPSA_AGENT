@@ -189,13 +189,12 @@ export const ChatMessage = memo(function ChatMessage({
           )}
         </div>
 
-        {/* Timestamp and tool calls */}
-        <div className={cn(
-          'flex items-center gap-2 flex-wrap',
-          isUser ? 'justify-end' : 'justify-start'
-        )}>
-          {/* Timestamp - shows on hover */}
-          {timestamp && (
+        {/* Timestamp - shows on hover */}
+        {timestamp && (
+          <div className={cn(
+            'flex items-center gap-2',
+            isUser ? 'justify-end' : 'justify-start'
+          )}>
             <span
               className={cn(
                 'inline-flex items-center gap-1 text-xs text-gray-400 transition-opacity',
@@ -205,23 +204,8 @@ export const ChatMessage = memo(function ChatMessage({
               <Clock className="h-3 w-3" />
               {timestamp}
             </span>
-          )}
-
-          {/* Tool calls indicator */}
-          {message.toolInvocations && message.toolInvocations.length > 0 && (
-            <>
-              {message.toolInvocations.map((tool, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-1 text-xs text-turquoise-700"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {tool.toolName}
-                </span>
-              ))}
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

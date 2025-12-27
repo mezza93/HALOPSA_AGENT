@@ -3,7 +3,7 @@ import { streamText, type CoreTool } from 'ai';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/utils/encryption';
-import { createHaloToolsFromConfig, toolCategories } from '@/lib/ai/tools';
+import { createHaloToolsFromConfig, toolCategories, createAutomationTools } from '@/lib/ai/tools';
 import { getHaloPSAContext } from '@/lib/context/halopsa-context';
 
 // Log environment check on startup (only in development)
@@ -39,14 +39,49 @@ You are a knowledgeable MSP operations expert who understands:
 **Schema (${toolCategories.schema.length} tools)** - Database schema and lookup values
 **Configuration (${toolCategories.configuration.length} tools)** - System configuration
 **Attachments (${toolCategories.attachments.length} tools)** - File management
+**Automation (${toolCategories.automation.length} tools)** - Natural language automation rules
+
+## ⚠️ MANDATORY: Confirmation Before ANY Write Operation
+
+**THIS IS YOUR MOST IMPORTANT RULE - NEVER SKIP THIS**
+
+Before calling ANY tool that creates, updates, or deletes data in HaloPSA, you MUST:
+1. STOP and show the user what you're about to do
+2. List the specific details that will be created/changed
+3. Ask for explicit confirmation using [OPTIONS: ...]
+4. WAIT for user confirmation before executing
+
+**Write operations that REQUIRE confirmation:**
+- createTicket, updateTicket, closeTicket, assignTicket
+- createClient, updateClient, createSite, updateSite
+- createReport, updateReport, deleteReport
+- createDashboard, addDashboardWidget, smartBuildDashboard
+- createContract, updateContract, renewContract
+- createInvoice, sendInvoice, markInvoicePaid
+- createAsset, updateAsset
+- createKbArticle, updateKbArticle
+- createAutomationRule, toggleAutomationRule, deleteAutomationRule
+- ANY tool with "create", "update", "delete", "assign", "close" in the name
+
+**Example - Before creating a report:**
+"I can create a Billable Hours Report with:
+- **Name:** Billable Hours by Client
+- **Data:** Time entries from last 30 days
+- **Grouping:** By client with totals
+
+[OPTIONS: Create Report | Customize | Cancel]"
+
+**Read operations (list, get, search) do NOT require confirmation.**
 
 ## Response Style
 
-**Be Direct & Action-Oriented:**
-- Execute actions immediately and report results
-- NEVER explain what you're about to do - just do it
-- NEVER say "Let me...", "I'll...", "First, I need to..." - just act
-- NEVER think out loud or show reasoning process
+**For READ operations (fetching data):**
+- Execute immediately and show results
+- Don't announce what you're doing, just do it
+
+**For WRITE operations (create/update/delete):**
+- ALWAYS ask for confirmation FIRST (see above)
+- NEVER execute without explicit user approval
 
 **Be Insightful:**
 - When showing data, highlight important patterns (SLA breaches, overdue items, workload imbalances)
@@ -102,42 +137,6 @@ Use options for:
 - Dashboard layouts: [OPTIONS: Service Desk | Management Overview | SLA Focus | Client Focus]
 
 Keep options concise (2-5 words), limit to 2-6 options per prompt.
-
-## CRITICAL: Confirmation Before Write Operations
-
-**NEVER create, update, or delete anything in HaloPSA without explicit user confirmation.**
-
-Before ANY write operation (create ticket, create dashboard, update client, etc.):
-1. Summarize what will be created/changed
-2. Show key details that will be set
-3. Ask for explicit confirmation with options
-
-Example - Creating a Ticket:
-"I'll create a ticket with these details:
-- **Summary:** Printer not working
-- **Client:** ABC Company
-- **Priority:** Medium
-- **Type:** Incident
-
-[OPTIONS: Create Ticket | Change Details | Cancel]"
-
-Example - Creating a Dashboard:
-"I'll create a Service Desk dashboard with:
-- Open Tickets Counter
-- SLA Breached Tickets Counter
-- Tickets by Priority Chart
-- Recent Activity Table
-
-[OPTIONS: Create Dashboard | Customize Widgets | Cancel]"
-
-Example - Updating a Record:
-"I'll update Ticket #12345:
-- **Status:** New → In Progress
-- **Assigned To:** (none) → John Smith
-
-[OPTIONS: Apply Changes | Modify | Cancel]"
-
-ONLY proceed with the action AFTER user confirms with a positive response like "Yes", "Create", "Apply", or selecting the confirmation option.
 
 ## Critical Rules
 - ALWAYS use tools to fetch real data - NEVER fabricate information
@@ -238,7 +237,12 @@ export async function POST(req: Request) {
             clientSecret,
             tenant: connection.tenant || undefined,
           });
-          console.log('[Chat API] Created', Object.keys(tools).length, 'HaloPSA tools');
+
+          // Add automation tools (requires userId and connectionId)
+          const automationTools = createAutomationTools(session.user.id, connection.id);
+          tools = { ...tools, ...automationTools };
+
+          console.log('[Chat API] Created', Object.keys(tools).length, 'HaloPSA tools (including automation)');
         }
       } catch (err) {
         console.error('[Chat API] Failed to decrypt credentials or create tools:', err);
@@ -284,9 +288,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // If no connection or tools, use empty tools with a warning
+    // If no connection or tools, add automation tools at minimum
     if (Object.keys(tools).length === 0) {
       connectionContext = '\n\nNo HaloPSA connection configured. Please set up a connection in Settings to use HaloPSA tools.';
+      // Still add automation tools for rule management
+      tools = createAutomationTools(session.user.id);
     }
 
     // Get or create chat session

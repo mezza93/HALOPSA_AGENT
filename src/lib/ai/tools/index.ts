@@ -30,10 +30,12 @@ import { createDashboardValidatorTools } from './dashboard-validator';
 import { createReportRepositoryTools } from './report-repository';
 import { createWebResourceTools } from './web-resources';
 import { createSchemaTools } from './schema';
+import { createAutomationTools } from './automation';
 
 export { createHaloContext, type HaloContext } from './context';
 export { createWebResourceTools } from './web-resources';
 export { createSchemaTools } from './schema';
+export { createAutomationTools } from './automation';
 
 /**
  * Create all HaloPSA tools for the AI agent.
@@ -445,5 +447,12 @@ export const toolCategories = {
     'searchHaloPSAReddit',
     'fetchContext7Docs',
     'fetchWebPage',
+  ],
+  automation: [
+    'createAutomationRule',
+    'listAutomationRules',
+    'toggleAutomationRule',
+    'deleteAutomationRule',
+    'suggestAutomationRules',
   ],
 } as const;

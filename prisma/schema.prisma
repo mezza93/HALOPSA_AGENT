@@ -43,11 +43,12 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts      Account[]
-  sessions      Session[]
-  connections   HaloConnection[]
-  chatSessions  ChatSession[]
-  auditLogs     AuditLog[]
+  accounts         Account[]
+  sessions         Session[]
+  connections      HaloConnection[]
+  chatSessions     ChatSession[]
+  auditLogs        AuditLog[]
+  automationRules  AutomationRule[]
 
   @@index([email])
   @@index([role])
@@ -134,9 +135,10 @@ model HaloConnection {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chatSessions  ChatSession[]
-  auditLogs     AuditLog[]
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatSessions     ChatSession[]
+  auditLogs        AuditLog[]
+  automationRules  AutomationRule[]
 
   @@index([userId])
   @@index([isActive])
@@ -402,4 +404,108 @@ enum SyncStatus {
   COMPLETED
   FAILED
   PARTIAL
+}
+
+// ===========================================
+// Automation Rules (Natural Language)
+// ===========================================
+
+model AutomationRule {
+  id            String    @id @default(cuid())
+  userId        String
+  connectionId  String?
+
+  // Rule definition (natural language)
+  name          String              // User-friendly name
+  description   String    @db.Text  // Natural language description
+
+  // Parsed rule components
+  triggerType   TriggerType         // What triggers the rule
+  triggerConfig Json                // Trigger-specific configuration
+  actionType    ActionType          // What action to perform
+  actionConfig  Json                // Action-specific configuration
+
+  // Conditions (parsed from natural language)
+  conditions    Json?               // Array of condition objects
+
+  // Status
+  isActive      Boolean   @default(true)
+  isPaused      Boolean   @default(false)
+
+  // Execution stats
+  executionCount Int      @default(0)
+  lastExecutedAt DateTime?
+  lastErrorAt   DateTime?
+  lastError     String?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection    HaloConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  executions    AutomationExecution[]
+
+  @@index([userId])
+  @@index([connectionId])
+  @@index([isActive])
+  @@index([triggerType])
+}
+
+enum TriggerType {
+  TICKET_CREATED       // When a new ticket is created
+  TICKET_UPDATED       // When a ticket is updated
+  TICKET_STATUS_CHANGED // When ticket status changes
+  TICKET_ASSIGNED      // When ticket is assigned
+  TICKET_PRIORITY_CHANGED // When priority changes
+  SLA_BREACH_WARNING   // Before SLA breach
+  SLA_BREACHED         // When SLA is breached
+  SCHEDULED            // Time-based trigger
+  MANUAL               // Manually triggered
+}
+
+enum ActionType {
+  ASSIGN_TICKET        // Assign to agent/team
+  CHANGE_PRIORITY      // Change ticket priority
+  CHANGE_STATUS        // Change ticket status
+  ADD_NOTE             // Add a note to ticket
+  SEND_NOTIFICATION    // Send email/notification
+  ADD_TAG              // Add tag/category
+  ESCALATE             // Escalate the ticket
+  CREATE_TASK          // Create a task
+  WEBHOOK              // Call external webhook
+}
+
+model AutomationExecution {
+  id            String    @id @default(cuid())
+  ruleId        String
+
+  // Execution details
+  triggerId     String?   // ID of the triggering entity (ticket, etc.)
+  triggerData   Json?     // Data that triggered the rule
+
+  // Result
+  status        ExecutionStatus @default(PENDING)
+  result        Json?           // Result data
+  errorMessage  String?
+
+  // Timing
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  // Relations
+  rule          AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
 }
