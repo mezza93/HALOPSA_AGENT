@@ -22,13 +22,13 @@ declare module 'next-auth' {
     user: {
       id: string;
       role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-      plan: 'FREE' | 'PRO' | 'ENTERPRISE';
+      plan: 'FREE' | 'PRO' | 'ENTERPRISE' | 'UNLIMITED';
     } & DefaultSession['user'];
   }
 
   interface User {
     role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-    plan: 'FREE' | 'PRO' | 'ENTERPRISE';
+    plan: 'FREE' | 'PRO' | 'ENTERPRISE' | 'UNLIMITED';
   }
 }
 
@@ -157,7 +157,7 @@ const authConfig: NextAuthConfig = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-        session.user.plan = token.plan as 'FREE' | 'PRO' | 'ENTERPRISE';
+        session.user.plan = token.plan as 'FREE' | 'PRO' | 'ENTERPRISE' | 'UNLIMITED';
       }
       return session;
     },

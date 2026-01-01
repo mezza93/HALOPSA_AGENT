@@ -26,6 +26,11 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
     initialize();
   }, [initialize]);
 
+  const [tokenLimitError, setTokenLimitError] = useState<{
+    tokensUsed: number;
+    percentUsed: number;
+  } | null>(null);
+
   const {
     messages,
     input,
@@ -45,7 +50,31 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
       console.error('Chat error:', err);
       // Try to extract a user-friendly error message
       let errorMessage = 'Failed to send message. Please try again.';
+
+      // Check if this is a token limit error (try to parse JSON from error message)
+      try {
+        // The error message might contain JSON data
+        const jsonMatch = err.message?.match(/\{.*\}/);
+        if (jsonMatch) {
+          const errorData = JSON.parse(jsonMatch[0]);
+          if (errorData.error?.includes('token limit') || errorData.tokensUsed) {
+            setTokenLimitError({
+              tokensUsed: errorData.tokensUsed || 0,
+              percentUsed: errorData.percentUsed || 100,
+            });
+            return; // Don't show toast, we'll show a custom UI
+          }
+        }
+      } catch {
+        // Not JSON, continue with normal error handling
+      }
+
       if (err.message) {
+        // Check for token limit in plain text
+        if (err.message.includes('token limit') || err.message.includes('Monthly token limit')) {
+          setTokenLimitError({ tokensUsed: 0, percentUsed: 100 });
+          return;
+        }
         // The AI SDK may return the error message from the API
         if (err.message.includes('AI service')) {
           errorMessage = err.message;
@@ -194,8 +223,40 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
             />
           )}
 
+          {/* Token Limit Error - User-friendly display */}
+          {tokenLimitError && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+                <svg className="h-8 w-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-amber-800">Monthly Token Limit Reached</h3>
+              <p className="mt-2 text-amber-700">
+                You've used all your tokens for this month.
+              </p>
+              <p className="mt-1 text-sm text-amber-600">
+                Your usage will reset on the 1st of next month.
+              </p>
+              <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
+                <a
+                  href="/settings"
+                  className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors"
+                >
+                  View Usage Details
+                </a>
+                <button
+                  onClick={() => setTokenLimitError(null)}
+                  className="inline-flex items-center justify-center rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Error state */}
-          {error && (
+          {error && !tokenLimitError && (
             <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-600">
               <p className="font-medium">Error</p>
               <p>{error.message}</p>

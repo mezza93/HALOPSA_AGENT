@@ -114,6 +114,7 @@ enum Plan {
   FREE
   PRO
   ENTERPRISE
+  UNLIMITED   // For testing/special accounts - no token limits
 }
 
 // OAuth Accounts (NextAuth.js)

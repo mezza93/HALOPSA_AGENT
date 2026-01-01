@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import {
   User,
@@ -25,9 +26,28 @@ import {
   FileText,
   Image as ImageIcon,
   RefreshCw,
+  Plus,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { formatRelativeTime } from '@/lib/utils/format';
+import { AddConnectionModal } from './add-connection-modal';
+
+interface Connection {
+  id: string;
+  name: string;
+  baseUrl: string;
+  isActive: boolean;
+  isDefault: boolean;
+  testStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
+  lastTestedAt: Date | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+}
 
 interface SettingsViewProps {
   user: {
@@ -36,6 +56,7 @@ interface SettingsViewProps {
     email?: string | null;
     image?: string | null;
   };
+  connections?: Connection[];
 }
 
 type TabId = 'profile' | 'connections' | 'branding' | 'notifications' | 'appearance' | 'security';
@@ -49,11 +70,24 @@ const tabs: { id: TabId; label: string; icon: React.ElementType; description: st
   { id: 'security', label: 'Security', icon: Shield, description: 'Password and 2FA' },
 ];
 
-export function SettingsView({ user }: SettingsViewProps) {
+export function SettingsView({ user, connections: initialConnections = [] }: SettingsViewProps) {
+  const router = useRouter();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabId>('profile');
   const [name, setName] = useState(user.name || '');
   const [isLoading, setIsLoading] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+  const [mounted, setMounted] = useState(false);
+
+  // Connections state
+  const [connections, setConnections] = useState<Connection[]>(initialConnections);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Avoid hydration mismatch with theme
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Branding state
   const [brandingLoading, setBrandingLoading] = useState(false);
@@ -177,6 +211,79 @@ export function SettingsView({ user }: SettingsViewProps) {
     setLogoUrl(null);
     setLogoFile(null);
     toast.info('Branding reset to defaults (save to apply)');
+  };
+
+  // Connection management functions
+  const handleTestConnection = async (connectionId: string) => {
+    setTestingId(connectionId);
+    try {
+      const response = await fetch(`/api/halopsa/connections/${connectionId}/test`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Connection test failed');
+      toast.success('Connection test successful');
+      router.refresh();
+    } catch {
+      toast.error('Connection test failed');
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const handleSetDefault = async (connectionId: string) => {
+    try {
+      const response = await fetch(`/api/halopsa/connections/${connectionId}/default`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Failed to set default connection');
+      toast.success('Default connection updated');
+      router.refresh();
+    } catch {
+      toast.error('Failed to set default connection');
+    }
+  };
+
+  const handleDeleteConnection = async (connectionId: string) => {
+    if (!confirm('Are you sure you want to delete this connection?')) return;
+    setDeletingId(connectionId);
+    try {
+      const response = await fetch(`/api/halopsa/connections/${connectionId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete connection');
+      setConnections(connections.filter((c) => c.id !== connectionId));
+      toast.success('Connection deleted');
+    } catch {
+      toast.error('Failed to delete connection');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const getStatusIcon = (status: Connection['testStatus']) => {
+    switch (status) {
+      case 'SUCCESS':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'FAILED':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case 'EXPIRED':
+        return <Clock className="h-5 w-5 text-yellow-500" />;
+      default:
+        return <Clock className="h-5 w-5 text-gray-400" />;
+    }
+  };
+
+  const getStatusText = (status: Connection['testStatus']) => {
+    switch (status) {
+      case 'SUCCESS':
+        return 'Connected';
+      case 'FAILED':
+        return 'Failed';
+      case 'EXPIRED':
+        return 'Expired';
+      default:
+        return 'Not tested';
+    }
   };
 
   return (
@@ -312,24 +419,133 @@ export function SettingsView({ user }: SettingsViewProps) {
             )}
 
             {activeTab === 'connections' && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-lg font-semibold">HaloPSA Connections</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Manage your HaloPSA instance connections
-                    </p>
-                  </div>
-                  <Link href="/settings/connections">
-                    <Button>
-                      <Link2 className="mr-2 h-4 w-4" />
-                      Manage Connections
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold">HaloPSA Connections</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Manage your HaloPSA instance connections
+                      </p>
+                    </div>
+                    <Button onClick={() => setShowAddModal(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Connection
                     </Button>
-                  </Link>
+                  </div>
+
+                  {connections.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Link2 className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <h3 className="mt-4 text-lg font-medium">No connections yet</h3>
+                      <p className="mt-2 text-muted-foreground">
+                        Connect your first HaloPSA instance to get started
+                      </p>
+                      <Button onClick={() => setShowAddModal(true)} className="mt-4">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Connection
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {connections.map((connection) => (
+                        <div
+                          key={connection.id}
+                          className="p-4 rounded-xl border border-gray-200 hover:border-turquoise-200 transition-colors flex items-start justify-between"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-turquoise-100">
+                              <Link2 className="h-6 w-6 text-turquoise-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold">{connection.name}</h3>
+                                {connection.isDefault && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-turquoise-100 px-2 py-0.5 text-xs font-medium text-turquoise-700">
+                                    <Star className="h-3 w-3" />
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {connection.baseUrl}
+                              </p>
+                              <div className="mt-2 flex items-center gap-4 text-sm">
+                                <div className="flex items-center gap-1.5">
+                                  {getStatusIcon(connection.testStatus)}
+                                  <span
+                                    className={
+                                      connection.testStatus === 'SUCCESS'
+                                        ? 'text-green-600'
+                                        : connection.testStatus === 'FAILED'
+                                        ? 'text-red-600'
+                                        : 'text-muted-foreground'
+                                    }
+                                  >
+                                    {getStatusText(connection.testStatus)}
+                                  </span>
+                                </div>
+                                {connection.lastUsedAt && (
+                                  <span className="text-muted-foreground">
+                                    Last used {formatRelativeTime(connection.lastUsedAt)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleTestConnection(connection.id)}
+                              disabled={testingId === connection.id}
+                            >
+                              {testingId === connection.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4" />
+                              )}
+                            </Button>
+                            {!connection.isDefault && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSetDefault(connection.id)}
+                                title="Set as default"
+                              >
+                                <Star className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteConnection(connection.id)}
+                              disabled={deletingId === connection.id}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              {deletingId === connection.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p className="text-muted-foreground text-center py-8">
-                  Go to the Connections page to add or manage your HaloPSA integrations.
-                </p>
+
+                {/* Add connection modal */}
+                <AddConnectionModal
+                  open={showAddModal}
+                  onClose={() => setShowAddModal(false)}
+                  onSuccess={() => {
+                    setShowAddModal(false);
+                    router.refresh();
+                  }}
+                />
               </div>
             )}
 
@@ -603,35 +819,50 @@ export function SettingsView({ user }: SettingsViewProps) {
             {activeTab === 'appearance' && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="text-lg font-semibold mb-6">Theme</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Choose how the application looks. Changes are applied immediately.
+                </p>
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { id: 'light', label: 'Light', icon: Sun },
-                    { id: 'dark', label: 'Dark', icon: Moon },
-                    { id: 'system', label: 'System', icon: Monitor },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => setTheme(option.id as typeof theme)}
-                      className={cn(
-                        'flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all',
-                        theme === option.id
-                          ? 'border-turquoise-500 bg-turquoise-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <option.icon className={cn(
-                        'h-8 w-8',
-                        theme === option.id ? 'text-turquoise-600' : 'text-gray-400'
-                      )} />
-                      <span className={cn(
-                        'font-medium',
-                        theme === option.id ? 'text-turquoise-700' : 'text-gray-600'
-                      )}>
-                        {option.label}
-                      </span>
-                    </button>
-                  ))}
+                    { id: 'light', label: 'Light', icon: Sun, description: 'Light background' },
+                    { id: 'dark', label: 'Dark', icon: Moon, description: 'Dark background' },
+                    { id: 'system', label: 'System', icon: Monitor, description: 'Match your device' },
+                  ].map((option) => {
+                    const isActive = mounted && theme === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setTheme(option.id)}
+                        className={cn(
+                          'flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all',
+                          isActive
+                            ? 'border-turquoise-500 bg-turquoise-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        )}
+                      >
+                        <option.icon className={cn(
+                          'h-8 w-8',
+                          isActive ? 'text-turquoise-600' : 'text-gray-400'
+                        )} />
+                        <span className={cn(
+                          'font-medium',
+                          isActive ? 'text-turquoise-700' : 'text-gray-600'
+                        )}>
+                          {option.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {mounted && (
+                  <p className="text-xs text-muted-foreground mt-4">
+                    Current theme: {resolvedTheme === 'dark' ? 'Dark' : 'Light'}
+                    {theme === 'system' && ' (System preference)'}
+                  </p>
+                )}
               </div>
             )}
 

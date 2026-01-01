@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SimpleTooltip, TooltipProvider } from '@/components/ui/tooltip';
+import { TokenUsageBar } from '@/components/ui/token-usage-bar';
 
 interface ChatHeaderProps {
   connectionName?: string;
@@ -67,43 +68,50 @@ export function ChatHeader({ connectionName, onClear, isLoading }: ChatHeaderPro
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1">
-          <SimpleTooltip content="Keyboard shortcuts" side="bottom">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground"
-              aria-label="Show keyboard shortcuts"
-            >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-          </SimpleTooltip>
+        <div className="flex items-center gap-3">
+          {/* Token Usage - Compact */}
+          <div className="hidden sm:block">
+            <TokenUsageBar compact />
+          </div>
 
-          <SimpleTooltip content="Start new chat" side="bottom">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClear}
-              className="text-muted-foreground"
-              aria-label="Start new chat"
-            >
-              <RotateCcw className="mr-1.5 h-4 w-4" />
-              <span className="hidden sm:inline">New Chat</span>
-            </Button>
-          </SimpleTooltip>
+          <div className="flex items-center gap-1">
+            <SimpleTooltip content="Keyboard shortcuts" side="bottom">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                aria-label="Show keyboard shortcuts"
+              >
+                <Keyboard className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
 
-          <SimpleTooltip content="Settings" side="bottom">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              asChild
-              className="text-muted-foreground"
-            >
-              <Link href="/settings" aria-label="Settings">
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
-          </SimpleTooltip>
+            <SimpleTooltip content="Start new chat" side="bottom">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClear}
+                className="text-muted-foreground"
+                aria-label="Start new chat"
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                <span className="hidden sm:inline">New Chat</span>
+              </Button>
+            </SimpleTooltip>
+
+            <SimpleTooltip content="Settings" side="bottom">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                asChild
+                className="text-muted-foreground"
+              >
+                <Link href="/settings" aria-label="Settings">
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+            </SimpleTooltip>
+          </div>
         </div>
       </div>
     </TooltipProvider>

@@ -619,18 +619,135 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
 
   /**
    * Search for reports by name or description.
+   * Uses multiple strategies to find reports:
+   * 1. Exact API search
+   * 2. Individual word search
+   * 3. Client-side fuzzy matching on full list
    */
   async search(query: string, options: {
     count?: number;
     category?: string;
     includeSystem?: boolean;
   } = {}): Promise<Report[]> {
-    return this.list({
-      search: query,
-      count: options.count ?? 50,
-      category: options.category,
-      includesystem: options.includeSystem ?? false,
+    const maxResults = options.count ?? 50;
+    const foundReports = new Map<number, Report>();
+
+    // Strategy 1: Direct API search with full query
+    try {
+      const directResults = await this.list({
+        search: query,
+        count: maxResults,
+        category: options.category,
+        includesystem: options.includeSystem ?? true, // Include system reports by default
+      });
+      directResults.forEach(r => foundReports.set(r.id, r));
+    } catch (e) {
+      console.warn('[ReportService] Direct search failed:', e);
+    }
+
+    // Strategy 2: Search for individual words from the query
+    const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    for (const word of words) {
+      if (foundReports.size >= maxResults) break;
+      try {
+        const wordResults = await this.list({
+          search: word,
+          count: Math.min(20, maxResults),
+          category: options.category,
+          includesystem: options.includeSystem ?? true,
+        });
+        wordResults.forEach(r => foundReports.set(r.id, r));
+      } catch (e) {
+        // Ignore individual word search failures
+      }
+    }
+
+    // Strategy 3: Get a large list and do client-side fuzzy matching
+    if (foundReports.size < 5) {
+      try {
+        const allReports = await this.list({
+          count: 500, // Get more reports for client-side matching
+          category: options.category,
+          includesystem: options.includeSystem ?? true,
+        });
+
+        const queryLower = query.toLowerCase();
+        const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+
+        for (const report of allReports) {
+          const nameLower = (report.name || '').toLowerCase();
+          const descLower = (report.description || '').toLowerCase();
+          const searchText = `${nameLower} ${descLower}`;
+
+          // Check for partial word matches
+          let matchScore = 0;
+          for (const word of queryWords) {
+            if (searchText.includes(word)) {
+              matchScore += 2;
+            } else {
+              // Check for fuzzy match (word contained in any report word)
+              const reportWords = searchText.split(/\s+/);
+              for (const rWord of reportWords) {
+                if (rWord.includes(word) || word.includes(rWord)) {
+                  matchScore += 1;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Also check for Levenshtein-like similarity for short queries
+          if (queryWords.length === 1 && queryWords[0].length >= 4) {
+            const singleWord = queryWords[0];
+            const reportWords = nameLower.split(/\s+/);
+            for (const rWord of reportWords) {
+              if (this.fuzzyMatch(singleWord, rWord)) {
+                matchScore += 1;
+              }
+            }
+          }
+
+          if (matchScore > 0) {
+            foundReports.set(report.id, report);
+          }
+        }
+      } catch (e) {
+        console.warn('[ReportService] Fuzzy search failed:', e);
+      }
+    }
+
+    // Sort by relevance (name match > description match)
+    const results = Array.from(foundReports.values());
+    const queryLower = query.toLowerCase();
+
+    results.sort((a, b) => {
+      const aNameMatch = (a.name || '').toLowerCase().includes(queryLower) ? 2 : 0;
+      const bNameMatch = (b.name || '').toLowerCase().includes(queryLower) ? 2 : 0;
+      const aExact = (a.name || '').toLowerCase() === queryLower ? 4 : 0;
+      const bExact = (b.name || '').toLowerCase() === queryLower ? 4 : 0;
+      return (bExact + bNameMatch) - (aExact + aNameMatch);
     });
+
+    return results.slice(0, maxResults);
+  }
+
+  /**
+   * Simple fuzzy match - checks if two strings are similar enough.
+   * Returns true if edit distance is small relative to string length.
+   */
+  private fuzzyMatch(s1: string, s2: string): boolean {
+    if (s1 === s2) return true;
+    if (Math.abs(s1.length - s2.length) > 3) return false;
+
+    // Simple check: do they share enough characters?
+    const set1 = new Set(s1.split(''));
+    const set2 = new Set(s2.split(''));
+    let common = 0;
+    for (const c of set1) {
+      if (set2.has(c)) common++;
+    }
+    const similarity = common / Math.max(set1.size, set2.size);
+    return similarity >= 0.7;
   }
 
   /**

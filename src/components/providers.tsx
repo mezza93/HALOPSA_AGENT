@@ -2,6 +2,7 @@
 
 import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { useState } from 'react';
 
@@ -25,18 +26,25 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            className: 'glass-card',
-            style: {
-              background: 'var(--card)',
-              color: 'var(--foreground)',
-              border: '1px solid var(--border)',
-            },
-          }}
-        />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              className: 'glass-card',
+              style: {
+                background: 'var(--card)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+              },
+            }}
+          />
+        </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

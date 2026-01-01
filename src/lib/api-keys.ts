@@ -260,6 +260,7 @@ export async function checkUserTokenLimit(
   tokensRemaining: number;
   percentUsed: number;
   monthlyLimit: number;
+  isUnlimited?: boolean;
 }> {
   const DEFAULT_MONTHLY_LIMIT = 1_000_000;
 
@@ -299,12 +300,28 @@ export async function checkUserTokenLimit(
   }
 
   // Determine limit based on plan
+  // UNLIMITED plan (-1) means no token limit
   const planLimits: Record<string, number> = {
-    FREE: 1_000_000,      // 1M tokens
-    PRO: 5_000_000,       // 5M tokens
+    FREE: 1_000_000,        // 1M tokens
+    PRO: 5_000_000,         // 5M tokens
     ENTERPRISE: 50_000_000, // 50M tokens
+    UNLIMITED: -1,          // Unlimited tokens (for testing/special accounts)
   };
-  const monthlyLimit = planLimits[user.plan] || DEFAULT_MONTHLY_LIMIT;
+
+  // Check for unlimited plan
+  const limit = planLimits[user.plan];
+  if (limit === -1) {
+    return {
+      hasLimit: false,
+      tokensUsed: user.monthlyTokens,
+      tokensRemaining: Infinity,
+      percentUsed: 0,
+      monthlyLimit: -1,
+      isUnlimited: true,
+    };
+  }
+
+  const monthlyLimit = limit || DEFAULT_MONTHLY_LIMIT;
 
   return {
     hasLimit: true,
@@ -312,6 +329,7 @@ export async function checkUserTokenLimit(
     tokensRemaining: Math.max(0, monthlyLimit - user.monthlyTokens),
     percentUsed: Math.round((user.monthlyTokens / monthlyLimit) * 100),
     monthlyLimit,
+    isUnlimited: false,
   };
 }
 

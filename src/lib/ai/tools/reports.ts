@@ -10,6 +10,12 @@ import { formatError, TOOL_DEFAULTS } from './utils';
 
 const { DEFAULT_COUNT, MAX_PAGE_SIZE: MAX_REPORT_ROWS } = TOOL_DEFAULTS;
 
+// Type for scored report results during search
+interface ScoredReport {
+  report: Report;
+  score: number;
+}
+
 export function createReportTools(ctx: HaloContext) {
   return {
     // === REPORT OPERATIONS ===
@@ -44,37 +50,222 @@ export function createReportTools(ctx: HaloContext) {
     searchReports: tool({
       description: `Search for reports by name, description, or keywords.
 Use this to find existing reports before creating new ones.
-More effective than listReports for finding specific reports.`,
+Uses multiple search strategies including fuzzy matching.
+
+TIPS:
+- Try different keyword combinations if the first search fails
+- Use "listReports" with high count to browse all reports if search fails
+- Report names often include terms like "Items", "Summary", "Analysis", etc.`,
       parameters: z.object({
         query: z.string().describe('Search query (name, description, or keywords)'),
         category: z.string().optional().describe('Filter by category'),
         count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum results'),
-        includeSystem: z.boolean().optional().default(false).describe('Include system reports'),
+        includeSystem: z.boolean().optional().default(true).describe('Include system/built-in reports'),
       }),
       execute: async ({ query, category, count, includeSystem }) => {
         try {
           const reports = await ctx.reports.search(query, {
             count: count || DEFAULT_COUNT,
             category,
-            includeSystem: includeSystem || false,
+            includeSystem: includeSystem ?? true, // Default to true to find more reports
           });
 
+          if (reports.length > 0) {
+            return {
+              success: true,
+              count: reports.length,
+              reports: reports.map((r: Report) => ({
+                id: r.id,
+                name: r.name,
+                category: r.category,
+                description: r.description,
+                isShared: r.isShared,
+              })),
+              message: `Found ${reports.length} reports matching "${query}"`,
+            };
+          }
+
+          // No results - try to get similar reports to suggest
+          const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+          let suggestions: Report[] = [];
+
+          // Get reports that might be related based on keywords
+          for (const word of queryWords.slice(0, 2)) {
+            try {
+              const wordResults = await ctx.reports.list({
+                count: 10,
+                includesystem: true,
+              });
+              suggestions.push(...wordResults);
+            } catch {
+              // Ignore
+            }
+          }
+
+          // Also get some recent/popular reports as fallback suggestions
+          if (suggestions.length < 5) {
+            try {
+              const recentReports = await ctx.reports.list({ count: 20, includesystem: true });
+              suggestions.push(...recentReports);
+            } catch {
+              // Ignore
+            }
+          }
+
+          // Filter to unique reports that might be related
+          const uniqueSuggestions = Array.from(
+            new Map(suggestions.map(r => [r.id, r])).values()
+          ).slice(0, 5);
+
           return {
-            success: true,
-            count: reports.length,
-            reports: reports.map((r: Report) => ({
-              id: r.id,
-              name: r.name,
-              category: r.category,
-              description: r.description,
-              isShared: r.isShared,
-            })),
-            message: reports.length > 0
-              ? `Found ${reports.length} reports matching "${query}"`
-              : `No reports found matching "${query}"`,
+            success: false,
+            count: 0,
+            reports: [],
+            message: `No reports found matching "${query}"`,
+            suggestions: uniqueSuggestions.length > 0 ? {
+              message: 'Here are some available reports that might be related:',
+              reports: uniqueSuggestions.map((r: Report) => ({
+                id: r.id,
+                name: r.name,
+                category: r.category,
+                description: r.description,
+              })),
+            } : undefined,
+            tips: [
+              'Try searching with different keywords (e.g., "ticket items" instead of "Ticket Items Report")',
+              'Use listReports to see all available reports',
+              'The report might have a slightly different name - check the suggestions above',
+              'Try searching for individual words like "ticket" or "items"',
+            ],
           };
         } catch (error) {
           return formatError(error, 'searchReports');
+        }
+      },
+    }),
+
+    findReportByName: tool({
+      description: `Find a specific report by its exact or similar name.
+This is more thorough than searchReports - it fetches ALL reports and uses
+fuzzy matching to find reports with similar names.
+
+Use this when:
+- You know the exact or approximate name of a report
+- searchReports didn't find what you were looking for
+- The user asks for a specific named report`,
+      parameters: z.object({
+        name: z.string().describe('The exact or approximate report name'),
+        maxResults: z.number().optional().default(10).describe('Maximum results to return'),
+      }),
+      execute: async ({ name, maxResults }) => {
+        try {
+          // Fetch a large list of all reports
+          const allReports = await ctx.reports.list({
+            count: 1000, // Get as many as possible
+            includesystem: true,
+          });
+
+          const nameLower = name.toLowerCase().trim();
+          const nameWords = nameLower.split(/\s+/).filter(w => w.length > 1);
+
+          // Score each report by how well it matches the name
+          const scoredReports = allReports.map((report: Report) => {
+            const reportName = (report.name || '').toLowerCase();
+            const reportDesc = (report.description || '').toLowerCase();
+            let score = 0;
+
+            // Exact match is best
+            if (reportName === nameLower) {
+              score = 1000;
+            }
+            // Contains the full query
+            else if (reportName.includes(nameLower)) {
+              score = 500;
+            }
+            // Query contains the report name
+            else if (nameLower.includes(reportName) && reportName.length > 5) {
+              score = 400;
+            }
+            else {
+              // Count matching words
+              for (const word of nameWords) {
+                if (reportName.includes(word)) {
+                  score += 50 * word.length; // Longer word matches are more valuable
+                }
+                if (reportDesc.includes(word)) {
+                  score += 10 * word.length;
+                }
+              }
+
+              // Bonus for matching word order
+              let lastIndex = -1;
+              let orderBonus = 0;
+              for (const word of nameWords) {
+                const idx = reportName.indexOf(word);
+                if (idx > lastIndex) {
+                  orderBonus += 20;
+                  lastIndex = idx + word.length;
+                }
+              }
+              score += orderBonus;
+
+              // Bonus for similar word count
+              const reportWords = reportName.split(/\s+/);
+              if (Math.abs(reportWords.length - nameWords.length) <= 1) {
+                score += 30;
+              }
+            }
+
+            return { report, score };
+          });
+
+          // Filter and sort by score
+          const matches = scoredReports
+            .filter((item: ScoredReport) => item.score > 0)
+            .sort((a: ScoredReport, b: ScoredReport) => b.score - a.score)
+            .slice(0, maxResults || 10);
+
+          if (matches.length === 0) {
+            // No matches - provide helpful info
+            return {
+              success: false,
+              message: `No reports found with name similar to "${name}"`,
+              totalReportsScanned: allReports.length,
+              suggestion: 'Try using listReports to see all available reports, or use different keywords',
+              sampleReports: allReports.slice(0, 10).map((r: Report) => ({
+                id: r.id,
+                name: r.name,
+                category: r.category,
+              })),
+            };
+          }
+
+          const bestMatch = matches[0];
+          const isExactMatch = bestMatch.score >= 500;
+
+          return {
+            success: true,
+            exactMatch: isExactMatch,
+            count: matches.length,
+            bestMatch: {
+              id: bestMatch.report.id,
+              name: bestMatch.report.name,
+              category: bestMatch.report.category,
+              description: bestMatch.report.description,
+              matchScore: bestMatch.score,
+            },
+            otherMatches: matches.length > 1 ? matches.slice(1).map((item: ScoredReport) => ({
+              id: item.report.id,
+              name: item.report.name,
+              category: item.report.category,
+              matchScore: item.score,
+            })) : undefined,
+            message: isExactMatch
+              ? `Found exact match: "${bestMatch.report.name}" (ID: ${bestMatch.report.id})`
+              : `Found ${matches.length} similar report(s). Best match: "${bestMatch.report.name}" (ID: ${bestMatch.report.id})`,
+          };
+        } catch (error) {
+          return formatError(error, 'findReportByName');
         }
       },
     }),
@@ -327,9 +518,10 @@ Useful for understanding report structure and configuring chart axes.`,
     }),
 
     runSavedReport: tool({
-      description: 'Run a saved/predefined report by name.',
+      description: `Run a saved/predefined report by name.
+Uses fuzzy matching to find the report, so exact name isn't required.`,
       parameters: z.object({
-        reportName: z.string().describe('Name of the saved report'),
+        reportName: z.string().describe('Name of the saved report (exact or approximate)'),
         startDate: z.string().optional().describe('Start date for filtering (YYYY-MM-DD)'),
         endDate: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
         clientId: z.number().optional().describe('Filter by client ID'),
@@ -337,23 +529,92 @@ Useful for understanding report structure and configuring chart axes.`,
       }),
       execute: async ({ reportName, startDate, endDate, clientId, agentId }) => {
         try {
-          // First find the report by name
-          const reports = await ctx.reports.list({ search: reportName, count: 10 });
-          const report = reports.find((r: Report) => r.name.toLowerCase().includes(reportName.toLowerCase()));
+          // Use the improved search to find the report
+          const reports = await ctx.reports.search(reportName, {
+            count: 50,
+            includeSystem: true,
+          });
 
-          if (!report) {
+          // Find the best match
+          const nameLower = reportName.toLowerCase();
+          const nameWords = nameLower.split(/\s+/).filter(w => w.length > 1);
+
+          let bestMatch: Report | null = null;
+          let bestScore = 0;
+
+          for (const report of reports) {
+            const reportNameLower = (report.name || '').toLowerCase();
+            let score = 0;
+
+            // Exact match
+            if (reportNameLower === nameLower) {
+              score = 1000;
+            }
+            // Contains full query
+            else if (reportNameLower.includes(nameLower)) {
+              score = 500;
+            }
+            // Word-based matching
+            else {
+              for (const word of nameWords) {
+                if (reportNameLower.includes(word)) {
+                  score += 50 * word.length;
+                }
+              }
+            }
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = report;
+            }
+          }
+
+          // If still no match, try getting all reports and doing a thorough search
+          if (!bestMatch && reports.length === 0) {
+            const allReports = await ctx.reports.list({ count: 500, includesystem: true });
+
+            for (const report of allReports) {
+              const reportNameLower = (report.name || '').toLowerCase();
+              let score = 0;
+
+              for (const word of nameWords) {
+                if (reportNameLower.includes(word)) {
+                  score += 50 * word.length;
+                }
+              }
+
+              if (score > bestScore) {
+                bestScore = score;
+                bestMatch = report;
+              }
+            }
+          }
+
+          if (!bestMatch) {
+            // Get some sample reports to suggest
+            const sampleReports = await ctx.reports.list({ count: 10, includesystem: true });
             return {
               success: false,
               error: `Report '${reportName}' not found`,
+              suggestions: {
+                message: 'Available reports that might be similar:',
+                reports: sampleReports.map((r: Report) => ({
+                  id: r.id,
+                  name: r.name,
+                  category: r.category,
+                })),
+              },
+              tip: 'Try using findReportByName for a more thorough search',
             };
           }
 
-          const result = await ctx.reports.run(report.id, { startDate, endDate, clientId, agentId });
+          const result = await ctx.reports.run(bestMatch.id, { startDate, endDate, clientId, agentId });
 
           return {
             success: true,
-            reportId: report.id,
-            reportName: report.name,
+            reportId: bestMatch.id,
+            reportName: bestMatch.name,
+            matchConfidence: bestScore >= 500 ? 'exact' : bestScore >= 200 ? 'high' : 'partial',
             columns: result.columns,
             rows: result.rows.slice(0, MAX_REPORT_ROWS),
             rowCount: result.rowCount,
