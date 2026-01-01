@@ -1,9 +1,279 @@
 /**
  * HaloPSA Context for AI Agent
  *
- * This module provides static HaloPSA documentation context
- * including database schema, SQL examples, variables, and reporting knowledge.
+ * This module provides comprehensive HaloPSA documentation context
+ * including product overview, features, database schema, SQL examples,
+ * variables, and reporting knowledge.
+ *
+ * Sources:
+ * - https://usehalo.com/halopsa/roadmap/
+ * - https://usehalo.com/product-updates/whats-new-in-halopsa-q2-2025/
+ * - https://usehalo.com/product-updates/halopsa-new-features-q1-2025/
+ * - https://halopsa.com/guides/
+ * - https://haloacademy.halopsa.com/apidoc/
  */
+
+/**
+ * HaloPSA Product Overview and Capabilities
+ */
+export const PRODUCT_OVERVIEW = `## HaloPSA Product Overview
+
+### What is HaloPSA?
+HaloPSA is an intuitive, all-inclusive Professional Services Automation (PSA) solution built to transform and modernize the delivery of managed IT services. It's part of the HALO ecosystem alongside HaloITSM (enterprise service management) and HaloCRM.
+
+### Target Markets
+- Managed Service Providers (MSPs)
+- Telecommunications companies
+- Cloud Solution Providers
+- IT Consultancy firms
+- Software companies
+- Internal IT departments
+
+### Core Modules
+
+**Service Management:**
+- Service Desk - Ticketing system designed for MSPs with full ITIL support
+- Self-Service Portal - Customer self-help with customizable branding
+- Knowledge Base - Searchable article repository with AI-powered suggestions
+
+**Financial & Operations:**
+- Billing & Invoicing - Streamlined billing with recurring invoices and payment tracking
+- Contract Management - Agreement tracking with auto-renewal and SLA linking
+- Stock Management - Centralized inventory tracking with warehouse support
+- Time Tracking - Accurate billable hour recording with approval workflows
+
+**Business Intelligence:**
+- Reporting & Analytics - Custom SQL reports with scheduled delivery
+- Dashboards - Real-time KPI visualization with drag-and-drop widgets
+- AI Insights - AI-powered data analysis and recommendations
+
+**Project Delivery:**
+- Project Management - Full project lifecycle from initiation to completion
+- Milestones & Budgets - Track progress against plans
+- Resource Allocation - Agent capacity planning
+
+**Sales & CRM:**
+- Opportunities - Sales pipeline management
+- Quotations - Quote generation with product catalog
+- Sales Orders - Order fulfillment tracking
+
+### ITIL Alignment
+- Incident Management - Standard ticket handling
+- Problem Management - Root cause analysis
+- Change Management - Change requests with approval workflows
+- Release Management - Software release tracking
+- Service Catalog - Requestable service offerings
+`;
+
+/**
+ * Recent HaloPSA Features (2025 Updates)
+ */
+export const RECENT_FEATURES = `## HaloPSA 2025 New Features
+
+### Q2 2025 Updates
+
+**Dedicated Chat Workspace**
+Full-screen chat interface replacing floating bubbles with filtered views (My Conversations, Team Conversations, All Conversations, Active, Closed).
+
+**Browser-Style Tabs**
+Multi-tab navigation allowing agents to work across tickets, assets, and reports simultaneously while maintaining state.
+
+**TimeGPT Forecasting**
+Integration with Nixtla's TimeGPT to predict ticket demand based on historical data. Supports forecasts from hours to months with event tagging for campaigns and holidays.
+
+**Invoice Follow-Ups**
+"View filtered overdue invoices" feature with reminder emails. Tracks "Last Reminder Sent" dates.
+
+**Flexible Billing Rules**
+Enhanced granularity with custom field filters from tickets, actions, agents, roles for precise condition-based billing.
+
+**Customer-Specific To-Do Groups**
+Tailored to-do templates by customer ensuring only relevant items appear on tickets.
+
+**Admin Mode**
+Elevated privileges requiring 2FA activation, granting temporary access (default 1 hour) for administrator accounts.
+
+**Secure Password Sharing**
+One-time links with optional passphrases for sharing sensitive information, accessible only to ticket end users.
+
+**Action Groups**
+Organize ticket actions under labeled categories with custom colors and icons.
+
+**Dashboard Repository**
+Online repository of pre-built dashboards by consultants, searchable by report names.
+
+### Q1 2025 Updates
+
+**Refreshed User Interface**
+Modernized design improving navigation speed and workflow fluidity across all modules.
+
+**AI Report Analysis**
+Analyzes reporting data with custom prompts, delivering actionable insights based on dataset patterns.
+
+**AI Statement of Work Automation**
+Transforms SOWs into structured ticket hierarchies automatically.
+
+**AI Client Profiling**
+Generates customer summaries from ticket history, flagging negative sentiment and churn risk.
+
+**Enhanced MYOB Integration**
+- Bill creation from purchase orders
+- Payment syncing to specified accounts
+- Recurring payment retrieval
+- Automatic deletion sync
+
+**SentinelOne Integration**
+Bidirectional threat management - auto-close in SentinelOne when resolved in Halo.
+
+**Custom Customer Areas**
+Segmented customer database filtering cascading to sites and users.
+
+**Drag & Drop Quote Lines**
+Reordering functionality for flexible quote management.
+`;
+
+/**
+ * HaloPSA AI Capabilities
+ */
+export const AI_CAPABILITIES = `## HaloPSA AI Capabilities
+
+### Built-in AI Features
+
+**AI Ticket Suggestions**
+- Suggests similar tickets and KB articles when creating/viewing tickets
+- Extended across ticket types (Incidents, Requests, Problems)
+- Contextual hints displayed while logging actions
+
+**AI Report Analysis**
+- Custom prompts for analyzing report data
+- Automatic insights and recommendations
+- Pattern detection in datasets
+
+**AI Client Profiling**
+- Analyzes recent ticket history per customer
+- Generates experience summaries for agents
+- Flags negative sentiment and churn risk
+
+**AI Statement of Work Processing**
+- Transforms SOWs into structured ticket series
+- Creates parent-child ticket relationships
+- Automatic project setup
+
+**AI Article Creation**
+- Helps create knowledge base articles from ticket resolutions
+- Suggests content structure and keywords
+
+**AI Emotion Detection**
+- Analyzes ticket and action text for sentiment
+- Helps prioritize tickets with frustrated customers
+
+### AI Integration Points
+- OpenAI/Azure OpenAI for text generation
+- TimeGPT (Nixtla) for demand forecasting
+- Custom AI prompts in reports and dashboards
+`;
+
+/**
+ * HaloPSA Integrations Overview
+ */
+export const INTEGRATIONS = `## HaloPSA Integrations
+
+### RMM Tools
+- ConnectWise Automate & Manage
+- Datto RMM & Autotask
+- NinjaRMM
+- N-able N-central & N-sight
+- Atera
+- Kaseya VSA/BMS
+
+### Communication
+- Microsoft Teams (ticketing, notifications, chat)
+- Slack integration
+- 3CX, 8x8, RingCentral (VoIP/telephony)
+- Email (Microsoft 365, Google Workspace, IMAP/SMTP)
+
+### Cloud & Identity
+- Microsoft Azure AD/Entra ID (SSO, sync)
+- Microsoft Intune (device sync)
+- AWS integration
+- Google Workspace
+
+### Accounting & Finance
+- QuickBooks Online/Desktop
+- Xero
+- MYOB
+- Sage
+- Microsoft Dynamics 365
+
+### Security & Monitoring
+- SentinelOne
+- CrowdStrike
+- Webroot
+- Acronis
+- Veeam
+
+### Remote Support
+- ConnectWise ScreenConnect
+- TeamViewer
+- Splashtop
+- AnyDesk
+
+### Documentation
+- IT Glue
+- Hudu
+- PassPortal
+
+### Custom Integrations
+- REST API (full CRUD operations)
+- Webhooks (incoming and outgoing)
+- Zapier/Power Automate connectors
+- Custom workflow automations
+`;
+
+/**
+ * HaloPSA Documentation Guide Categories
+ */
+export const GUIDE_CATEGORIES = `## HaloPSA Documentation & Guides
+
+### Getting Started
+- Setup and Configuration (12 guides)
+- Basic Configuration (8 guides) - themes, custom fields, portal
+- Email Configuration (17 guides) - mailbox setup, rules, templates, Azure/Google
+
+### ITIL Processes
+- Incident Management (10 guides) - ticket types, workflows, templates
+- Problem Management
+- Change Management - approvals, software releases
+
+### Admin Guides
+- Agent Configuration (8 guides) - roles, permissions, API
+- Service Level Agreements (4 guides)
+- Knowledge Base (2 guides)
+- Asset Management (8 guides) - discovery, licensing, stock
+- Developers (7 guides) - API, database, NHServer
+- Project Management (6 guides) - milestones, billing
+
+### Agent Guides (25+ topics)
+- Time tracking and calendars
+- Invoicing and contracts
+- Notifications and search
+- Client management
+
+### Integrations (50+ documented)
+- Cloud platforms, RMM tools, communication
+- Accounting systems, security tools
+- Custom API integrations
+
+### Reporting (21 guides)
+- Dashboards and charts
+- SQL reports and scheduling
+- Export and customization
+
+### Resources
+- HaloPSA Academy: academy.halopsa.com
+- API Documentation: haloacademy.halopsa.com/apidoc
+- Community forums and support portal
+`;
 
 /**
  * HaloPSA Database Schema Reference (NOSC Cloud)
@@ -425,10 +695,22 @@ export const API_REFERENCE = `## HaloPSA API Endpoints Reference (OpenAPI v2)
 
 /**
  * Get the full HaloPSA context for the AI agent.
+ * This comprehensive context includes product overview, features, technical details,
+ * and best practices for working with HaloPSA.
  */
 export function getHaloPSAContext(): string {
   return `
-## HaloPSA Reference Documentation
+# HaloPSA Complete Reference Documentation
+
+${PRODUCT_OVERVIEW}
+
+${RECENT_FEATURES}
+
+${AI_CAPABILITIES}
+
+${INTEGRATIONS}
+
+${GUIDE_CATEGORIES}
 
 ${DATABASE_SCHEMA}
 
@@ -466,5 +748,34 @@ ${API_REFERENCE}
 - If a widget shows no data, check if the report has charttype, xaxis, yaxis configured
 - If report creation fails, check SQL syntax (TOP clause, brackets, valid JOINs)
 - For filter-based counters, ensure filter_id and ticketarea_id are both > 0
+
+### Useful Resources
+- HaloPSA Academy: https://academy.halopsa.com
+- API Documentation: https://haloacademy.halopsa.com/apidoc
+- Guides: https://halopsa.com/guides/
+- Product Updates: https://usehalo.com/product-updates/
+- Roadmap: https://usehalo.com/halopsa/roadmap/
+`;
+}
+
+/**
+ * Get a condensed version of HaloPSA context for memory-constrained scenarios.
+ */
+export function getHaloPSAContextCondensed(): string {
+  return `
+# HaloPSA Quick Reference
+
+${PRODUCT_OVERVIEW}
+
+${AI_CAPABILITIES}
+
+${DATABASE_SCHEMA}
+
+${DASHBOARD_CONTEXT}
+
+## Key Resources
+- Academy: https://academy.halopsa.com
+- API Docs: https://haloacademy.halopsa.com/apidoc
+- Guides: https://halopsa.com/guides/
 `;
 }

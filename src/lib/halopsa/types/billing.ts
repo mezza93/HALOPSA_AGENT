@@ -168,6 +168,11 @@ export interface ProjectApiResponse {
 
 /**
  * Expense entity.
+ *
+ * @deprecated HaloPSA API does not have a dedicated /Expense endpoint.
+ * Expenses are typically tracked via time entries with expense flags,
+ * project line items, or invoice line items.
+ * This type is kept for reference but is not actively used.
  */
 export interface Expense extends HaloBaseEntity {
   amount: number;
@@ -188,6 +193,7 @@ export interface Expense extends HaloBaseEntity {
 
 /**
  * Raw expense from API.
+ * @deprecated See Expense interface deprecation note.
  */
 export interface ExpenseApiResponse {
   id: number;
@@ -316,6 +322,7 @@ export function transformProject(data: ProjectApiResponse): Project {
 
 /**
  * Transform API response to Expense interface.
+ * @deprecated See Expense interface deprecation note.
  */
 export function transformExpense(data: ExpenseApiResponse): Expense {
   return {

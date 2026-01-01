@@ -369,6 +369,177 @@ export class DashboardService extends BaseService<Dashboard, DashboardApiRespons
   async deleteDashboard(dashboardId: number): Promise<void> {
     await this.client.delete(`${this.endpoint}/${dashboardId}`);
   }
+
+  /**
+   * Clone/duplicate a dashboard.
+   */
+  async cloneDashboard(dashboardId: number, newName?: string): Promise<Dashboard> {
+    const original = await this.get(dashboardId);
+
+    // Create new dashboard with copied widgets
+    const newWidgets = (original.widgets || []).map((w, index) => ({
+      title: w.name,
+      type: this.widgetTypeToNumber(w.widgetType),
+      reportId: w.reportId,
+      filterId: w.filterId,
+      ticketAreaId: w.ticketAreaId,
+      x: w.positionX,
+      y: w.positionY,
+      w: w.width,
+      h: w.height,
+      colour: w.colour,
+    }));
+
+    return this.createDashboard({
+      name: newName ?? `${original.name} (Copy)`,
+      description: original.description,
+      widgets: newWidgets,
+    });
+  }
+
+  /**
+   * Convert widget type string to number.
+   */
+  private widgetTypeToNumber(widgetType: string | undefined): number {
+    const typeMap: Record<string, number> = {
+      'chart': 0,
+      'bar': 0,
+      'pie': 1,
+      'line': 1,
+      'counter_report': 2,
+      'table': 5,
+      'list': 6,
+      'counter': 7,
+    };
+    return typeMap[widgetType || 'chart'] ?? 0;
+  }
+
+  /**
+   * Update a specific widget on a dashboard.
+   */
+  async updateWidget(
+    dashboardId: number,
+    widgetIndex: number,
+    updates: {
+      title?: string;
+      reportId?: number;
+      filterId?: number;
+      ticketAreaId?: number;
+      width?: number;
+      height?: number;
+      positionX?: number;
+      positionY?: number;
+      colour?: string;
+    }
+  ): Promise<Dashboard> {
+    const dashboard = await this.get(dashboardId);
+
+    if (!dashboard.widgets || widgetIndex >= dashboard.widgets.length) {
+      throw new Error(`Widget index ${widgetIndex} not found on dashboard ${dashboardId}`);
+    }
+
+    // Build updated widgets list
+    const updatedWidgets: Array<Record<string, unknown>> = [];
+
+    for (let i = 0; i < dashboard.widgets.length; i++) {
+      const w = dashboard.widgets[i];
+      const rawWidget = w as unknown as Record<string, unknown>;
+
+      const widgetData: Record<string, unknown> = {
+        i: rawWidget.i ?? String(i + 1),
+        title: w.name,
+        type: rawWidget.type ?? this.widgetTypeToNumber(w.widgetType),
+        x: w.positionX,
+        y: w.positionY,
+        w: w.width,
+        h: w.height,
+      };
+
+      if (w.reportId) widgetData.report_id = w.reportId;
+      if (w.filterId) widgetData.filter_id = w.filterId;
+      if (w.ticketAreaId) widgetData.ticketarea_id = w.ticketAreaId;
+      if (w.colour) widgetData.initialcolour = w.colour;
+
+      // Apply updates if this is the target widget
+      if (i === widgetIndex) {
+        if (updates.title !== undefined) widgetData.title = updates.title;
+        if (updates.reportId !== undefined) widgetData.report_id = updates.reportId;
+        if (updates.filterId !== undefined) widgetData.filter_id = updates.filterId;
+        if (updates.ticketAreaId !== undefined) widgetData.ticketarea_id = updates.ticketAreaId;
+        if (updates.width !== undefined) widgetData.w = updates.width;
+        if (updates.height !== undefined) widgetData.h = updates.height;
+        if (updates.positionX !== undefined) widgetData.x = updates.positionX;
+        if (updates.positionY !== undefined) widgetData.y = updates.positionY;
+        if (updates.colour !== undefined) widgetData.initialcolour = updates.colour;
+      }
+
+      updatedWidgets.push(widgetData);
+    }
+
+    return this.updateDashboard(dashboardId, { widgets: updatedWidgets });
+  }
+
+  /**
+   * Remove a widget from a dashboard.
+   */
+  async removeWidget(dashboardId: number, widgetIndex: number): Promise<Dashboard> {
+    const dashboard = await this.get(dashboardId);
+
+    if (!dashboard.widgets || widgetIndex >= dashboard.widgets.length) {
+      throw new Error(`Widget index ${widgetIndex} not found on dashboard ${dashboardId}`);
+    }
+
+    // Build widgets list without the removed widget
+    const updatedWidgets: Array<Record<string, unknown>> = [];
+
+    for (let i = 0; i < dashboard.widgets.length; i++) {
+      if (i === widgetIndex) continue; // Skip the widget to remove
+
+      const w = dashboard.widgets[i];
+      const rawWidget = w as unknown as Record<string, unknown>;
+
+      const widgetData: Record<string, unknown> = {
+        i: String(updatedWidgets.length + 1), // Renumber
+        title: w.name,
+        type: rawWidget.type ?? this.widgetTypeToNumber(w.widgetType),
+        x: w.positionX,
+        y: w.positionY,
+        w: w.width,
+        h: w.height,
+      };
+
+      if (w.reportId) widgetData.report_id = w.reportId;
+      if (w.filterId) widgetData.filter_id = w.filterId;
+      if (w.ticketAreaId) widgetData.ticketarea_id = w.ticketAreaId;
+      if (w.colour) widgetData.initialcolour = w.colour;
+
+      updatedWidgets.push(widgetData);
+    }
+
+    return this.updateDashboard(dashboardId, { widgets: updatedWidgets });
+  }
+
+  /**
+   * Get all widgets on a dashboard.
+   */
+  async getWidgets(dashboardId: number): Promise<DashboardWidget[]> {
+    const dashboard = await this.get(dashboardId);
+    return dashboard.widgets || [];
+  }
+
+  /**
+   * Set dashboard as default.
+   */
+  async setAsDefault(dashboardId: number): Promise<Dashboard> {
+    return this.updateDashboard(dashboardId, { isShared: true });
+  }
+
+  /**
+   * Share/unshare a dashboard.
+   */
+  async setShared(dashboardId: number, isShared: boolean): Promise<Dashboard> {
+    return this.updateDashboard(dashboardId, { isShared });
+  }
 }
 
 /**
@@ -444,6 +615,94 @@ export class ReportService extends BaseService<Report, ReportApiResponse> {
 
     const response = await this.client.get<string>(`${this.endpoint}/${reportId}/export`, params);
     return response;
+  }
+
+  /**
+   * Search for reports by name or description.
+   */
+  async search(query: string, options: {
+    count?: number;
+    category?: string;
+    includeSystem?: boolean;
+  } = {}): Promise<Report[]> {
+    return this.list({
+      search: query,
+      count: options.count ?? 50,
+      category: options.category,
+      includesystem: options.includeSystem ?? false,
+    });
+  }
+
+  /**
+   * Clone/duplicate a report.
+   */
+  async clone(reportId: number, newName?: string): Promise<Report> {
+    // Get the original report
+    const original = await this.get(reportId);
+
+    // Create a new report with the same configuration
+    return this.createCustomReport({
+      name: newName ?? `${original.name} (Copy)`,
+      sqlQuery: original.sqlQuery ?? '',
+      description: original.description,
+      category: original.category,
+      isShared: false,
+    });
+  }
+
+  /**
+   * Preview/test a SQL query without saving.
+   */
+  async preview(sqlQuery: string, options: {
+    maxRows?: number;
+    startDate?: string;
+    endDate?: string;
+  } = {}): Promise<{
+    columns: string[];
+    rows: Record<string, unknown>[];
+    rowCount: number;
+    error?: string;
+  }> {
+    try {
+      const params: Record<string, string | number> = {
+        sql: sqlQuery,
+        count: options.maxRows ?? 10,
+      };
+      if (options.startDate) params.startdate = options.startDate;
+      if (options.endDate) params.enddate = options.endDate;
+
+      const response = await this.client.post<{
+        columns?: string[];
+        rows?: Record<string, unknown>[];
+        record_count?: number;
+        error?: string;
+      }>('/Report/preview', params);
+
+      return {
+        columns: response.columns ?? [],
+        rows: response.rows ?? [],
+        rowCount: response.record_count ?? response.rows?.length ?? 0,
+      };
+    } catch (error) {
+      return {
+        columns: [],
+        rows: [],
+        rowCount: 0,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Get report columns/schema without running the full query.
+   */
+  async getColumns(reportId: number): Promise<{
+    columns: Array<{ name: string; type?: string }>;
+  }> {
+    const result = await this.run(reportId, {});
+    return {
+      columns: result.columns.map(name => ({ name })),
+    };
   }
 
   /**

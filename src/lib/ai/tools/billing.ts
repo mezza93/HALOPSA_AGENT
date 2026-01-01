@@ -1,12 +1,16 @@
 /**
  * Billing-related AI tools for HaloPSA.
- * Covers time entries, invoices, projects, and expenses.
+ * Covers time entries, invoices, and projects.
+ *
+ * NOTE: Expenses are not supported - HaloPSA does not have a dedicated /Expense endpoint.
+ * Expenses are typically tracked via time entries with expense flags, project line items,
+ * or invoice line items.
  */
 
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { HaloContext } from './context';
-import type { TimeEntry, Invoice, Project, Expense } from '@/lib/halopsa/types';
+import type { TimeEntry, Invoice, Project } from '@/lib/halopsa/types';
 import { formatError, TOOL_DEFAULTS } from './utils';
 
 const { DEFAULT_COUNT } = TOOL_DEFAULTS;
@@ -467,88 +471,5 @@ export function createBillingTools(ctx: HaloContext) {
       },
     }),
 
-    // === EXPENSE OPERATIONS ===
-    listExpenses: tool({
-      description: 'List expenses with optional filters.',
-      parameters: z.object({
-        agentId: z.number().optional().describe('Filter by agent ID'),
-        clientId: z.number().optional().describe('Filter by client ID'),
-        projectId: z.number().optional().describe('Filter by project ID'),
-        startDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-        endDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
-        unbilledOnly: z.boolean().optional().default(false).describe('Only show unbilled expenses'),
-        count: z.number().optional().default(DEFAULT_COUNT).describe('Maximum number to return'),
-      }),
-      execute: async ({ agentId, clientId, projectId, startDate, endDate, unbilledOnly, count }) => {
-        try {
-          const expenses = await ctx.expenses.listFiltered({
-            agentId,
-            clientId,
-            projectId,
-            startDate,
-            endDate,
-            unbilledOnly,
-            count: count || DEFAULT_COUNT,
-          });
-
-          return {
-            success: true,
-            data: expenses.map((e: Expense) => ({
-              id: e.id,
-              description: e.description,
-              amount: e.amount,
-              date: e.expenseDate,
-              billable: e.billable,
-              category: e.category,
-            })),
-          };
-        } catch (error) {
-          return formatError(error, 'listExpenses');
-        }
-      },
-    }),
-
-    createExpense: tool({
-      description: 'Create a new expense.',
-      parameters: z.object({
-        amount: z.number().describe('Expense amount'),
-        description: z.string().describe('Expense description'),
-        expenseDate: z.string().describe('Expense date (YYYY-MM-DD)'),
-        category: z.string().optional().describe('Expense category'),
-        ticketId: z.number().optional().describe('Associated ticket ID'),
-        projectId: z.number().optional().describe('Associated project ID'),
-        clientId: z.number().optional().describe('Client ID'),
-        billable: z.boolean().optional().default(true).describe('Whether the expense is billable'),
-        reimbursable: z.boolean().optional().default(true).describe('Whether the expense is reimbursable'),
-      }),
-      execute: async ({ amount, description, expenseDate, category, ticketId, projectId, clientId, billable, reimbursable }) => {
-        try {
-          const expenseData: Record<string, unknown> = {
-            amount,
-            description,
-            expenseDate,
-            billable,
-            reimbursable,
-          };
-
-          if (category) expenseData.category = category;
-          if (ticketId) expenseData.ticketId = ticketId;
-          if (projectId) expenseData.projectId = projectId;
-          if (clientId) expenseData.clientId = clientId;
-
-          const expenses = await ctx.expenses.create([expenseData]);
-          if (expenses && expenses.length > 0) {
-            return {
-              success: true,
-              expenseId: expenses[0].id,
-              amount: expenses[0].amount,
-            };
-          }
-          return { success: false, error: 'Failed to create expense' };
-        } catch (error) {
-          return formatError(error, 'createExpense');
-        }
-      },
-    }),
   };
 }

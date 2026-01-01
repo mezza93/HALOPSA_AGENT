@@ -1,5 +1,8 @@
 /**
  * Time tracking and billing services for HaloPSA API operations.
+ *
+ * IMPORTANT: HaloPSA API uses /TimesheetEvent for time entries, not /TimeEntry.
+ * The service is named TimeEntryService for clarity but uses the correct endpoint.
  */
 
 import { HaloPSAClient } from '../client';
@@ -11,8 +14,6 @@ import {
   InvoiceApiResponse,
   Project,
   ProjectApiResponse,
-  Expense,
-  ExpenseApiResponse,
   TimeSummary,
   InvoiceSummary,
   InvoiceStatus,
@@ -20,15 +21,15 @@ import {
   transformTimeEntry,
   transformInvoice,
   transformProject,
-  transformExpense,
 } from '../types/billing';
 import { ListParams } from '../types/common';
 
 /**
  * Service for time entry operations.
+ * Uses the /TimesheetEvent endpoint in HaloPSA API.
  */
 export class TimeEntryService extends BaseService<TimeEntry, TimeEntryApiResponse> {
-  protected endpoint = '/TimeEntry';
+  protected endpoint = '/TimesheetEvent';
 
   protected transform(data: TimeEntryApiResponse): TimeEntry {
     return transformTimeEntry(data);
@@ -313,45 +314,16 @@ export class ProjectService extends BaseService<Project, ProjectApiResponse> {
 }
 
 /**
- * Service for expense operations.
+ * REMOVED: ExpenseService
+ *
+ * The HaloPSA API does not have a dedicated /Expense endpoint.
+ * Expenses in HaloPSA are typically tracked via:
+ * - Time entries with expense flags
+ * - Project line items
+ * - Invoice line items
+ *
+ * If you need expense tracking, consider using:
+ * - TimeEntryService with appropriate activity types
+ * - ProjectService for project-related costs
+ * - InvoiceService for billing expenses to clients
  */
-export class ExpenseService extends BaseService<Expense, ExpenseApiResponse> {
-  protected endpoint = '/Expense';
-
-  protected transform(data: ExpenseApiResponse): Expense {
-    return transformExpense(data);
-  }
-
-  /**
-   * List expenses with filters.
-   */
-  async listFiltered(options: {
-    agentId?: number;
-    clientId?: number;
-    projectId?: number;
-    startDate?: Date | string;
-    endDate?: Date | string;
-    unbilledOnly?: boolean;
-    count?: number;
-  } = {}): Promise<Expense[]> {
-    const {
-      agentId,
-      clientId,
-      projectId,
-      startDate,
-      endDate,
-      unbilledOnly,
-      count = 100,
-    } = options;
-
-    const params: ListParams = { count };
-    if (agentId) params.agent_id = agentId;
-    if (clientId) params.client_id = clientId;
-    if (projectId) params.project_id = projectId;
-    if (startDate) params.startdate = startDate instanceof Date ? startDate.toISOString() : startDate;
-    if (endDate) params.enddate = endDate instanceof Date ? endDate.toISOString() : endDate;
-    if (unbilledOnly) params.unbilled_only = true;
-
-    return this.list(params);
-  }
-}

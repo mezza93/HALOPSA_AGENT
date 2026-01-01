@@ -126,6 +126,48 @@ export function ChatInput({
     }
   };
 
+  // Handle paste from clipboard (for screenshots)
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        // Check if the pasted item is an image
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            // Check file size
+            if (file.size > MAX_FILE_SIZE) {
+              console.warn(`Pasted image is too large (max 10MB)`);
+              continue;
+            }
+            // Create a named file (clipboard images often have no name)
+            const extension = file.type.split('/')[1] || 'png';
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const namedFile = new File(
+              [file],
+              `screenshot-${timestamp}.${extension}`,
+              { type: file.type }
+            );
+            imageFiles.push(namedFile);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        // Prevent default paste behavior for images
+        e.preventDefault();
+        setAttachments([...attachments, ...imageFiles]);
+      }
+      // If no images, allow default paste behavior (for text)
+    },
+    [attachments, setAttachments]
+  );
+
   // Get file icon
   const getFileIcon = (file: File) => {
     if (file.type.startsWith('image/')) {
@@ -201,6 +243,7 @@ export function ChatInput({
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Ask anything about your HaloPSA data..."
               className="w-full resize-none rounded-2xl bg-transparent px-4 py-4 pr-24 text-foreground placeholder:text-muted-foreground focus:outline-none"
               rows={1}
@@ -248,9 +291,9 @@ export function ChatInput({
 
         {/* Help text */}
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for new line. Drag & drop files or
-          click{' '}
-          <Paperclip className="inline h-3 w-3" /> to attach images.
+          Press Enter to send, Shift+Enter for new line. Paste screenshots with
+          Ctrl+V, drag & drop files, or click{' '}
+          <Paperclip className="inline h-3 w-3" /> to attach.
         </p>
       </div>
     </div>

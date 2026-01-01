@@ -66,10 +66,14 @@ export class SLAService extends BaseService<SLA, SLAApiResponse> {
 }
 
 /**
- * Service for recurring service operations.
+ * Service for recurring invoice operations.
+ *
+ * IMPORTANT: HaloPSA API uses /RecurringInvoice, not /RecurringService.
+ * The class is named RecurringServiceService for backwards compatibility
+ * but uses the correct API endpoint.
  */
 export class RecurringServiceService extends BaseService<RecurringService, RecurringServiceApiResponse> {
-  protected endpoint = '/RecurringService';
+  protected endpoint = '/RecurringInvoice';
 
   protected transform(data: RecurringServiceApiResponse): RecurringService {
     return transformRecurringService(data);
