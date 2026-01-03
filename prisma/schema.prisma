@@ -193,6 +193,7 @@ model HaloConnection {
 
   @@index([userId])
   @@index([isActive])
+  @@index([userId, isDefault])  // Optimizes finding user's default connection
 }
 
 enum ConnectionStatus {
@@ -233,6 +234,8 @@ model ChatSession {
   @@index([userId])
   @@index([connectionId])
   @@index([lastMessageAt])
+  @@index([userId, isArchived])  // Optimizes history page queries
+  @@index([userId, lastMessageAt])  // Optimizes sorted user sessions
 }
 
 model ChatMessage {
@@ -503,6 +506,7 @@ model AutomationRule {
   @@index([connectionId])
   @@index([isActive])
   @@index([triggerType])
+  @@index([userId, isActive])  // Optimizes fetching user's active rules
 }
 
 enum TriggerType {

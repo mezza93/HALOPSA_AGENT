@@ -4,6 +4,14 @@
 
 import { HaloConnectionConfig, TokenResponse, ListParams } from './types';
 import { AuthenticationError, APIError, RateLimitError, NotFoundError } from './errors';
+import { apiCache, CACHE_TTL, withCache } from './cache';
+
+export interface CacheOptions {
+  /** Whether to use caching for this request (default: true for GET) */
+  useCache?: boolean;
+  /** TTL in seconds (uses endpoint-specific defaults if not specified) */
+  ttl?: number;
+}
 
 /**
  * HTTP client for HaloPSA API with automatic token management.
@@ -12,9 +20,19 @@ export class HaloPSAClient {
   private config: HaloConnectionConfig;
   private accessToken: string | null = null;
   private tokenExpiresAt: Date | null = null;
+  private connectionId: string;
 
-  constructor(config: HaloConnectionConfig) {
+  constructor(config: HaloConnectionConfig, connectionId?: string) {
     this.config = config;
+    // Use a unique identifier for caching - connectionId or hash of config
+    this.connectionId = connectionId || this.generateConfigHash();
+  }
+
+  /**
+   * Generate a hash for cache key when no connectionId is provided.
+   */
+  private generateConfigHash(): string {
+    return `${this.config.baseUrl}:${this.config.clientId.substring(0, 8)}`;
   }
 
   /**
@@ -123,13 +141,68 @@ export class HaloPSAClient {
   }
 
   /**
-   * Make GET request to API.
+   * Determine the default TTL for an endpoint.
+   */
+  private getDefaultTTL(endpoint: string): number {
+    const ep = endpoint.toLowerCase();
+
+    // Schema and configuration endpoints - long cache
+    if (ep.includes('schema') || ep.includes('column') || ep.includes('field')) {
+      return CACHE_TTL.SCHEMA;
+    }
+    if (ep.includes('config') || ep.includes('status') || ep.includes('type') || ep.includes('priority')) {
+      return CACHE_TTL.CONFIG;
+    }
+
+    // Report list endpoint - medium cache
+    if (ep.includes('report') && !ep.includes('result')) {
+      return CACHE_TTL.REPORTS;
+    }
+
+    // Lookup endpoints
+    if (ep.includes('client') || ep.includes('agent') || ep.includes('user')) {
+      return CACHE_TTL.LOOKUP;
+    }
+
+    // Ticket data - short cache
+    if (ep.includes('ticket')) {
+      return CACHE_TTL.TICKETS;
+    }
+
+    // Default for other endpoints
+    return CACHE_TTL.REALTIME;
+  }
+
+  /**
+   * Make GET request to API with optional caching.
    * @param endpoint - API endpoint (e.g., "/Ticket")
    * @param params - Query parameters
+   * @param cacheOptions - Caching options
    * @returns Response JSON data.
    * @throws APIError if request fails.
    */
-  async get<T = unknown>(endpoint: string, params?: ListParams): Promise<T> {
+  async get<T = unknown>(endpoint: string, params?: ListParams, cacheOptions?: CacheOptions): Promise<T> {
+    const useCache = cacheOptions?.useCache !== false;
+    const ttl = cacheOptions?.ttl ?? this.getDefaultTTL(endpoint);
+
+    // Use caching wrapper for cacheable requests
+    if (useCache) {
+      return withCache<T>(
+        this.connectionId,
+        endpoint,
+        () => this.fetchGet<T>(endpoint, params),
+        { ttl },
+        params as Record<string, unknown>
+      );
+    }
+
+    return this.fetchGet<T>(endpoint, params);
+  }
+
+  /**
+   * Internal method to perform the actual GET request.
+   */
+  private async fetchGet<T = unknown>(endpoint: string, params?: ListParams): Promise<T> {
     const headers = await this.getHeaders();
 
     let url = `${this.apiUrl}${endpoint}`;
@@ -199,6 +272,9 @@ export class HaloPSAClient {
       this.handleError(endpoint, 'POST', response, text);
     }
 
+    // Invalidate related cache entries after successful POST (creates/updates data)
+    apiCache.invalidatePattern(this.connectionId, endpoint.split('/')[1] || endpoint);
+
     return response.json();
   }
 
@@ -236,11 +312,21 @@ export class HaloPSAClient {
       this.handleError(endpoint, 'DELETE', response, text);
     }
 
+    // Invalidate related cache entries after successful DELETE
+    apiCache.invalidatePattern(this.connectionId, endpoint.split('/')[1] || endpoint);
+
     const text = await response.text();
     if (text) {
       return JSON.parse(text);
     }
     return null;
+  }
+
+  /**
+   * Invalidate cache for this connection.
+   */
+  invalidateCache(): void {
+    apiCache.invalidateConnection(this.connectionId);
   }
 
   /**
@@ -266,7 +352,9 @@ export class HaloPSAClient {
 
 /**
  * Create a HaloPSA client from connection configuration.
+ * @param config - Connection configuration
+ * @param connectionId - Optional connection ID for caching (recommended for multi-tenant)
  */
-export function createHaloClient(config: HaloConnectionConfig): HaloPSAClient {
-  return new HaloPSAClient(config);
+export function createHaloClient(config: HaloConnectionConfig, connectionId?: string): HaloPSAClient {
+  return new HaloPSAClient(config, connectionId);
 }

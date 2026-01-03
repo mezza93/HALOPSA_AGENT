@@ -475,29 +475,32 @@ Use this at the start of conversations when:
  */
 export async function getMemoryContextForUser(userId: string): Promise<string> {
   try {
-    // Get high-importance memories
-    const importantMemories = await prisma.conversationMemory.findMany({
-      where: {
-        userId,
-        importance: { gte: 7 },
-      },
-      orderBy: { importance: 'desc' },
-      take: 10,
-    });
-
-    // Get recently accessed memories
+    // Calculate date for recent memories query
     const recentDate = new Date();
     recentDate.setDate(recentDate.getDate() - 7);
 
-    const recentMemories = await prisma.conversationMemory.findMany({
-      where: {
-        userId,
-        lastAccessedAt: { gte: recentDate },
-        importance: { lt: 7 },
-      },
-      orderBy: { lastAccessedAt: 'desc' },
-      take: 5,
-    });
+    // Run both memory queries in parallel for better performance
+    const [importantMemories, recentMemories] = await Promise.all([
+      // Get high-importance memories
+      prisma.conversationMemory.findMany({
+        where: {
+          userId,
+          importance: { gte: 7 },
+        },
+        orderBy: { importance: 'desc' },
+        take: 10,
+      }),
+      // Get recently accessed memories
+      prisma.conversationMemory.findMany({
+        where: {
+          userId,
+          lastAccessedAt: { gte: recentDate },
+          importance: { lt: 7 },
+        },
+        orderBy: { lastAccessedAt: 'desc' },
+        take: 5,
+      }),
+    ]);
 
     const allMemories = [...importantMemories, ...recentMemories];
 

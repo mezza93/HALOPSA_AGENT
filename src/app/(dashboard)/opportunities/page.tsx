@@ -16,22 +16,23 @@ export default async function OpportunitiesPage() {
     redirect('/login');
   }
 
-  // Get user's connections
-  const connections = await prisma.haloConnection.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // Get knowledge base items count
-  const kbItemsCount = await prisma.knowledgeBaseItem.count({
-    where: { userId: session.user.id },
-  });
-
-  // Get latest sync status
-  const latestSync = await prisma.knowledgeBaseSync.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { syncedAt: 'desc' },
-  });
+  // Run all queries in parallel for better performance
+  const [connections, kbItemsCount, latestSync] = await Promise.all([
+    // Get user's connections
+    prisma.haloConnection.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Get knowledge base items count
+    prisma.knowledgeBaseItem.count({
+      where: { userId: session.user.id },
+    }),
+    // Get latest sync status
+    prisma.knowledgeBaseSync.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { syncedAt: 'desc' },
+    }),
+  ]);
 
   return (
     <OpportunitiesView

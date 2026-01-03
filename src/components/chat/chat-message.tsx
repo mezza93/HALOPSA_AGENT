@@ -1,14 +1,12 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Message } from 'ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter, SyntaxHighlighterProps } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Sparkles, Copy, Check, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { User, Sparkles, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { CodeBlock } from './code-block';
 
 interface ChatMessageProps {
   message: Message;
@@ -23,7 +21,6 @@ function formatTime(date: Date | string | undefined): string {
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
 
   // If less than 1 minute ago
   if (minutes < 1) return 'Just now';
@@ -54,18 +51,11 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isLoading,
 }: ChatMessageProps) {
-  const [copied, setCopied] = useState(false);
   const [showTimestamp, setShowTimestamp] = useState(false);
   const isUser = message.role === 'user';
   const displayContent = useMemo(() => cleanMessageContent(message.content), [message.content]);
 
   const timestamp = useMemo(() => formatTime(message.createdAt), [message.createdAt]);
-
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div
@@ -121,27 +111,7 @@ export const ChatMessage = memo(function ChatMessage({
 
                     if (!isInline && match) {
                       return (
-                        <div className="relative group">
-                          <button
-                            onClick={() => copyToClipboard(codeString)}
-                            className="absolute right-2 top-2 rounded-md bg-gray-700 p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
-                            title="Copy code"
-                          >
-                            {copied ? (
-                              <Check className="h-4 w-4 text-green-400" />
-                            ) : (
-                              <Copy className="h-4 w-4 text-gray-400" />
-                            )}
-                          </button>
-                          <SyntaxHighlighter
-                            style={oneDark as SyntaxHighlighterProps['style']}
-                            language={match[1]}
-                            PreTag="div"
-                            className="rounded-lg !mt-0"
-                          >
-                            {codeString}
-                          </SyntaxHighlighter>
-                        </div>
+                        <CodeBlock language={match[1]}>{codeString}</CodeBlock>
                       );
                     }
 
