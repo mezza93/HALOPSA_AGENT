@@ -51,31 +51,31 @@
   }
 
   .dark {
-    /* Dark mode */
-    --background: 180 10% 4%;
-    --foreground: 180 10% 98%;
-    --card: 180 10% 7%;
-    --card-foreground: 180 10% 98%;
-    --popover: 180 10% 7%;
-    --popover-foreground: 180 10% 98%;
-    --primary: 173 97% 45%;
-    --primary-foreground: 180 10% 4%;
-    --secondary: 180 10% 15%;
-    --secondary-foreground: 180 10% 98%;
-    --muted: 180 10% 15%;
-    --muted-foreground: 180 10% 55%;
-    --accent: 174 97% 15%;
-    --accent-foreground: 173 97% 70%;
-    --destructive: 0 62% 50%;
+    /* Dark mode - Refined, modern dark theme */
+    --background: 220 20% 10%;
+    --foreground: 210 20% 95%;
+    --card: 220 20% 13%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 20% 12%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 173 80% 50%;
+    --primary-foreground: 220 20% 10%;
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 210 20% 90%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 173 50% 20%;
+    --accent-foreground: 173 80% 65%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 180 10% 18%;
-    --input: 180 10% 18%;
-    --ring: 173 97% 45%;
+    --border: 220 15% 20%;
+    --input: 220 15% 18%;
+    --ring: 173 80% 50%;
 
-    /* Dark gradient colors */
-    --gradient-start: hsla(174, 97%, 30%, 0.25);
-    --gradient-mid: hsla(189, 100%, 40%, 0.15);
-    --gradient-end: hsla(174, 97%, 30%, 0.25);
+    /* Dark gradient colors - Subtle and elegant */
+    --gradient-start: hsla(173, 80%, 40%, 0.15);
+    --gradient-mid: hsla(200, 80%, 50%, 0.08);
+    --gradient-end: hsla(173, 80%, 40%, 0.15);
   }
 }
 

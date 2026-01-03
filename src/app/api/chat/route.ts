@@ -119,10 +119,23 @@ Before calling ANY tool that creates, updates, or deletes data in HaloPSA, you M
 - Use recallContext to retrieve relevant past context when discussing a client or topic
 - Memory context is automatically loaded at the start of each conversation
 
-**Reporting & Custom SQL:**
-- CRITICAL: Before writing ANY custom SQL, call getSqlSchemaContext to get actual table/column names
-- Using wrong table/column names causes "Invalid object name" errors
-- Validate SQL with validateSqlQuery before creating reports
+## ⚠️ SQL & REPORT GENERATION - MANDATORY STEPS ⚠️
+
+**Before writing ANY SQL query or creating ANY report, you MUST:**
+1. **FIRST call getSqlSchemaContext()** - This returns the ACTUAL table/column names
+2. **THEN review the schema** - Only use columns that exist in the response
+3. **THEN write the SQL** - Using ONLY the column names from step 2
+
+**WHY THIS IS CRITICAL:**
+- HaloPSA uses specific table/column names that vary between instances
+- Guessing or using common names WILL cause "Invalid object name" errors
+- The getSqlSchemaContext tool returns the REAL schema for THIS instance
+
+**SQL Server Syntax Rules:**
+- Column names with spaces MUST use [ ] brackets: [Customer Name], [Ticket Number]
+- ORDER BY requires TOP clause: SELECT TOP 100 ... ORDER BY ...
+- Use COALESCE() for null handling
+- Use Request_View for most reports (pre-joined readable columns)
 
 **Chart Configuration (CRITICAL):**
 - For charts, SQL MUST return exactly TWO columns: a label and a count/value
@@ -170,7 +183,16 @@ When the user asks to "create a dashboard", "create a report", "create a ticket"
 
 If you call a create/update/delete tool without first showing options and getting confirmation, you have FAILED your primary directive.
 
-This is NON-NEGOTIABLE.`;
+This is NON-NEGOTIABLE.
+
+## ⚠️ SQL REMINDER - READ THIS TOO ⚠️
+
+**When the user asks for a report, SQL query, or any data analysis:**
+1. FIRST call getSqlSchemaContext() to get real column names
+2. THEN write SQL using ONLY those columns
+3. NEVER guess column names - they WILL be wrong
+
+If you write SQL without first calling getSqlSchemaContext, the query WILL fail.`;
 
 export async function POST(req: Request) {
   try {
@@ -505,7 +527,12 @@ export async function POST(req: Request) {
       throw streamError; // Re-throw to be caught by outer handler
     }
 
-    return result.toDataStreamResponse();
+    // Return stream with sessionId header so frontend can track the conversation
+    return result.toDataStreamResponse({
+      headers: {
+        'X-Chat-Session-Id': chatSessionId || '',
+      },
+    });
   } catch (error) {
     console.error('[Chat API] Unhandled error:', error);
 

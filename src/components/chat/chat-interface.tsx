@@ -15,11 +15,14 @@ interface ChatInterfaceProps {
   sessionId?: string;
 }
 
-export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
+export function ChatInterface({ userId, sessionId: initialSessionId }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const { activeConnection, initialize, isLoading: isLoadingConnection } = useConnectionStore();
+
+  // Track the current session ID - starts with prop value or null
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
 
   // Initialize connection store on mount
   useEffect(() => {
@@ -45,6 +48,14 @@ export function ChatInterface({ userId, sessionId }: ChatInterfaceProps) {
     api: '/api/chat',
     body: {
       connectionId: activeConnection?.id,
+      sessionId: currentSessionId,
+    },
+    onResponse: (response) => {
+      // Capture session ID from the first response to maintain conversation continuity
+      const sessionId = response.headers.get('X-Chat-Session-Id');
+      if (sessionId && !currentSessionId) {
+        setCurrentSessionId(sessionId);
+      }
     },
     onError: (err) => {
       console.error('Chat error:', err);

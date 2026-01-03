@@ -50,9 +50,9 @@ export function DashboardSidebar({ user }: SidebarProps) {
 
   return (
     <TooltipProvider>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-gray-200 bg-background lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-border bg-card lg:flex">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
+        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-turquoise-400 to-turquoise-600 shadow-lg shadow-turquoise-500/25">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
@@ -81,8 +81,8 @@ export function DashboardSidebar({ user }: SidebarProps) {
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all',
                   isActive
-                    ? 'bg-turquoise-100 text-turquoise-700 shadow-sm'
-                    : 'text-muted-foreground hover:bg-gray-100 hover:text-foreground'
+                    ? 'bg-turquoise-500/15 text-turquoise-600 dark:text-turquoise-400 shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -99,8 +99,8 @@ export function DashboardSidebar({ user }: SidebarProps) {
                 <kbd className={cn(
                   "hidden group-hover:inline-flex h-5 min-w-[20px] items-center justify-center rounded border text-[10px] font-mono",
                   isActive
-                    ? "border-turquoise-300 bg-turquoise-50"
-                    : "border-gray-200 bg-gray-50"
+                    ? "border-turquoise-400/50 bg-turquoise-500/10 dark:border-turquoise-500/30 dark:bg-turquoise-500/10"
+                    : "border-border bg-muted"
                 )}>
                   {item.shortcut}
                 </kbd>
@@ -111,7 +111,7 @@ export function DashboardSidebar({ user }: SidebarProps) {
           {/* Admin section */}
           {isAdmin && (
             <>
-              <div className="my-4 border-t border-gray-200" />
+              <div className="my-4 border-t border-border" />
               <p className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Administration
               </p>
@@ -124,8 +124,8 @@ export function DashboardSidebar({ user }: SidebarProps) {
                     className={cn(
                       'group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all',
                       isActive
-                        ? 'bg-turquoise-100 text-turquoise-700 shadow-sm'
-                        : 'text-muted-foreground hover:bg-gray-100 hover:text-foreground'
+                        ? 'bg-turquoise-500/15 text-turquoise-600 dark:text-turquoise-400 shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
                     {isActive && (
@@ -142,10 +142,10 @@ export function DashboardSidebar({ user }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-border p-4">
           <Link
             href="/help"
-            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-gray-100 hover:text-foreground transition-all group"
+            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all group"
           >
             <HelpCircle className="h-5 w-5" />
             <span className="flex-1">Help & Support</span>
@@ -153,7 +153,7 @@ export function DashboardSidebar({ user }: SidebarProps) {
           </Link>
 
           {/* User profile */}
-          <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-100 p-3 border border-gray-200">
+          <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/50 p-3 border border-border">
             <Link href="/settings/profile" className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity">
               {user.image ? (
                 <img
@@ -174,7 +174,7 @@ export function DashboardSidebar({ user }: SidebarProps) {
             <SimpleTooltip content="Sign out" side="top">
               <button
                 onClick={() => signOut({ callbackUrl: '/' })}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-gray-200 hover:text-red-500 transition-colors"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
                 aria-label="Sign out"
               >
                 <LogOut className="h-4 w-4" />
